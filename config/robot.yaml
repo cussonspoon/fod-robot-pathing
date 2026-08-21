@@ -1,0 +1,53 @@
+# Measured on: YYYY-MM-DD   by: ____   chassis rev: ____
+# Camera mount frozen: YYYY-MM-DD. If the mount moves, §3 and the ground
+# calibration are void.
+
+drive:
+  wheel_radius_m: null        # §2.1, 10-revolution roll test
+  track_width_m: null         # §2.2, corrected by the 10-rotation spin test
+  ticks_per_rev: null         # §2.3, verified by hand rotation
+  quadrature: null            # 1 | 2 | 4
+  v_max_mps: null             # §2.5
+  v_min_mps: null             # §2.5, deadband
+  omega_max_radps: null
+  omega_min_radps: null
+  stopping_distance_m: null   # §2.6, from v_max
+
+camera:
+  height_m: null              # §3
+  tilt_deg: null              # target band 10-25
+  offset_x_m: null
+  offset_y_m: null
+  roll_deg: null
+  capture_width_px: null      # must match the calibration frame_size
+  capture_height_px: null
+  fov_near_limit_m: null      # §3.1 -- sizes the terminal blind leg
+  fov_far_limit_m: null
+  fov_width_at_lookahead_m: null
+
+drum:
+  width_m: null               # §4
+  capture_width_m: null       # measured pickup width, not mechanical width
+  offset_x_m: null
+  clearance_mm: null
+
+obstacle:
+  tof_height_m: null
+  tof_offset_x_m: null
+  tof_threshold_m: null
+
+chassis:
+  mass_kg: null
+  footprint_length_m: null
+  footprint_width_m: null
+  planner_margin_m: null      # half footprint + clearance
+
+power:
+  nominal_v: null
+  warn_v: null
+  cutoff_v: null
+
+link:
+  port: null                  # /dev/serial/by-id/... never /dev/ttyACM0
+  baud: 115200
+  proto_version: 1

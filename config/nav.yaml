@@ -1,0 +1,118 @@
+# nav.yaml -- gains, tolerances, rates and mode switches. Nav owns this file.
+#
+# Everything here is TUNED, not measured. That is why it is a separate file
+# from robot.yaml: robot.yaml is Teemy's, it holds measurements of the physical
+# robot, and its git history is the calibration record. Nothing in this file is
+# a fact about the hardware, and nothing in robot.yaml is a choice.
+#
+# Any value here that would be a measurement is not here -- it is a null in
+# robot.yaml. Where a controller needs a speed, this file states a *fraction*
+# of the measured v_max rather than a number in m/s, because nav does not know
+# how fast this chassis goes and must not pretend to.
+#
+# Schema, validation and defaults live in src/fodnav/config.py.
+
+loop:
+  rate_hz: 50               # protocol.md §6: V goes out at a fixed 50 Hz, always,
+                            # including V 0.000 0.000. Never skipped, never late.
+  vision_timeout_ms: 400    # ~12 missed frames at the 30 Hz publish rate. No message
+                            # for this long means vision is dead -> S. Note an empty
+                            # dets list is a message; it means "floor is clear".
+  max_stall_ms: 30          # a loop iteration longer than this gets logged loudly.
+                            # At 50 Hz the budget is 20 ms; 30 ms means something
+                            # blocked and the watchdog is now in play.
+
+mission:
+  mode: coverage            # coverage | target | idle
+                            # CLAUDE.md §11: the evaluation paradigm is UNRESOLVED
+                            # between the team and the advisor. Both modes are
+                            # built; this switch picks one at run time. Do not
+                            # delete the other branch to tidy up.
+  search: hold              # hold | scan -- what target mode does with nothing in view.
+                            # hold is the default because a search pattern is an
+                            # invented behaviour with no requirement behind it: the
+                            # demo throws the nail into the field of view. scan spins
+                            # slowly on the spot and is there for the day the nail
+                            # lands off to one side.
+  scan_omega_frac: 0.25     # of the measured omega_max, when scanning
+  magnet_on: true           # run the drum while the mission is active
+  arena:                    # the seeded grid, world metres. The planner insets this
+    x_min: 0.0              # by chassis.planner_margin_m before planning rows.
+    y_min: 0.0
+    x_max: 3.0
+    y_max: 3.0
+
+control:                    # move_to() and follow_path(), for planned waypoints
+  goal_radius_m: 0.05       # arrival tolerance for a coverage waypoint
+  heading_tolerance_rad: 0.05
+  turn_in_place_rad: 0.60   # heading error past which forward speed is zeroed
+  k_omega: 2.0              # tuned in sim; RE-TUNE ON HARDWARE
+  k_v: 1.2                  # tuned in sim; RE-TUNE ON HARDWARE
+  cruise_fraction: 0.60     # of the measured drive.v_max_mps
+  lookahead_m: 0.30         # pure pursuit, for the long straight rows
+  slowdown_bearing_rad: 1.20
+
+servo:                      # visual servo, for driving to a detected object
+  k_omega: 1.8
+  k_v: 0.4                  # v = k_v * (range - stop_range), capped at cruise.
+                            # Sized so the proportional term actually bites before
+                            # the blind-leg handover: with cruise = 0.6 * v_max and
+                            # stop_range = drum.offset_x_m, deceleration starts at
+                            # about 0.6 m. Set it much higher and the robot arrives
+                            # at the latch still at full cruise, which is a fine way
+                            # to overshoot a nail by the length of the blind leg.
+  turn_first_rad: 0.70
+  blind_leg_extra_m: 0.02   # margin on the open-loop terminal leg (CLAUDE.md §5)
+  blind_leg_min_v_frac: 0.30 # of the cruise speed. A pure proportional law converges
+                            # exponentially, so without a floor the robot spends seconds
+                            # creeping the last few centimetres at v_min -- and the drum
+                            # is 18 cm wide, so that precision buys nothing.
+  blind_leg_timeout_s: 6.0
+  lost_timeout_s: 1.0
+
+detections:
+  topic: fod/detections     # CLAUDE.md §8. Does not exist yet -- tools/fake_detections.py
+                            # is the only publisher until Bthcorn implements it.
+  broker_host: 127.0.0.1
+  broker_port: 1883
+  acquire_conf: 0.50        # hysteresis pair: acquire high...
+  drop_conf: 0.30           # ...drop low, so a flickering box does not thrash the FSM
+  target_classes: [nail, screw, bolt]   # ONE target class. The CV repo reliably finds
+                            # screws and reliably calls them bolts; PRD FR-3 wants a
+                            # single metal_fastener anyway. Never branch on which.
+  ignore_classes: [unknown] # 53% of the training data, four shapes in a trench coat,
+                            # and the class that fires on furniture.
+  assoc_max_jump_m: 0.20
+  min_hits: 3
+  max_misses: 5
+
+planner:
+  swath_source: drum        # drum | drum_capture | camera
+                            # CLAUDE.md §9: the defensible value depends on whether
+                            # coverage means collection or detection, which is the
+                            # unresolved §11 question. Default drum; logged per run.
+  overlap: 0.15
+  start_corner: sw
+  orientation: long         # rows along the rectangle's long axis, to minimise turns
+
+link:
+  boot_wait_s: 2.0          # protocol.md §7 step 1
+  handshake_timeout_s: 3.0  # protocol.md §7 step 2
+
+safety:
+  stop_on_obstacle: true    # firmware flag bit 3
+  stop_on_battery_low: false # bit 6 is a warning, not a cutoff; the firmware owns cutoff
+
+sim:                        # error sources for sim/unicycle.py (CLAUDE.md §10)
+  dt_s: 0.02
+  wheel_scale_left: 1.015   # 1.5% larger effective radius on the left wheel.
+                            # THIS IS THE POINT OF THE SIMULATOR. Systematic
+                            # curvature, not gaussian noise, is what breaks a 4 m
+                            # dead-reckoned drive. Do not set this to 1.0 and then
+                            # conclude move_to() works.
+  wheel_scale_right: 1.0
+  tick_noise_std: 0.5
+  heading_bias_radps: 0.002
+  slip_prob: 0.0
+  slip_fraction: 0.3
+  seed: 1

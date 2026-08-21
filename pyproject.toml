@@ -1,0 +1,43 @@
+[project]
+name = "fod-robot-pathing"
+version = "0.1.0"
+description = "Navigation, path planning and motion control for the FOD robot."
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+
+# Dependency baseline is fixed by CLAUDE.md section 2: two CPU cores and a
+# Raspberry Pi. Ask before adding to this list.
+#   opencv-python-headless, not opencv-python -- the only runtime OpenCV call is
+#   findHomography and the GUI build drags in X11 for nothing.
+dependencies = [
+    "numpy>=2.0",
+    "pyserial>=3.5",
+    "paho-mqtt>=2.0",
+    "pyyaml>=6.0",
+    "opencv-python-headless>=4.10",
+]
+
+[project.scripts]
+fodnav-sim = "fodnav.cli.sim:main"
+fodnav-teleop = "fodnav.cli.teleop:main"
+fodnav-calib-ground = "fodnav.cli.calib_ground:main"
+fodnav-replay = "fodnav.cli.replay:main"
+fodnav-run = "fodnav.cli.run:main"
+
+[dependency-groups]
+# matplotlib is for sim plots only. It must never be imported by runtime code.
+dev = [
+    "pytest>=8.0",
+    "matplotlib>=3.9",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/fodnav"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
