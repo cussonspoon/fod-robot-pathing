@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+
+# uv
+.uv/
+
+# pytest
+.pytest_cache/
+
+# Run logs. Every run writes a directory here (CLAUDE.md section 12); they are
+# the reproduction record for a given run, not source, and they are large.
+logs/*
+!logs/.gitkeep
+
+# Calibration output is committed deliberately, by hand, alongside the
+# robot.yaml revision it was captured against -- it is not build output.
+# config/ground_homography.json is NOT ignored.
+
+.DS_Store

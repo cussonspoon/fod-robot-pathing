@@ -1,0 +1,74 @@
+# sim_robot.yaml -- A ROBOT THAT DOES NOT EXIST.
+#
+# ===========================================================================
+#  NOTHING IN THIS FILE IS A MEASUREMENT OF ANYTHING.
+#  Every number is invented. It describes a plausible small differential-drive
+#  robot so that the nav stack runs end to end on a laptop with no camera, no
+#  Pi and no chassis. It is never loaded by a run that talks to hardware.
+#
+#  Do not copy a value out of here into config/robot.yaml. Ever. If you find
+#  yourself tempted, the number you want is in docs/HARDWARE.md as a
+#  measurement procedure, and Teemy takes it.
+# ===========================================================================
+#
+# Schema-identical to config/robot.yaml on purpose: same keys, same loader,
+# same validation, so swapping one for the other is a single flag and the
+# simulated path exercises exactly the code the real path does.
+
+drive:
+  wheel_radius_m: 0.0325      # 65 mm wheel
+  track_width_m: 0.2000
+  ticks_per_rev: 1440.0       # 12 CPR x 30:1 gearbox x4 quadrature
+  quadrature: 4
+  v_max_mps: 0.45
+  v_min_mps: 0.03
+  omega_max_radps: 3.0
+  omega_min_radps: 0.15
+  stopping_distance_m: 0.06
+
+camera:
+  height_m: 0.220
+  tilt_deg: 18.0              # inside the 10-25 band the CV repo synthesised
+  offset_x_m: 0.100
+  offset_y_m: 0.0
+  roll_deg: 0.0
+  capture_width_px: 2304      # matches the frame_size in the CLAUDE.md §8 example
+  capture_height_px: 1296
+  # These three are DERIVED from the fictional optics in src/fodnav/sim/camera.py
+  # (a 102 deg lens at the mount geometry above), not chosen separately. A
+  # fictional robot whose declared field of view disagreed with the camera it
+  # actually publishes through would trigger the blind-leg handover at the wrong
+  # distance and teach us something false. tests/test_sim_camera.py pins them.
+  fov_near_limit_m: 0.2672    # bottom image row. Blind leg = this minus drum.offset_x_m
+  fov_far_limit_m: 1.600      # detector-limited, not geometry-limited: this camera
+                              # can see the horizon, which is what the horizon guard is for
+  fov_width_at_lookahead_m: 0.6377  # frame width on the floor at 0.3 m -- note it is
+                              # nearly 3x the drum width, which is the whole of the
+                              # CLAUDE.md §9 swath question, in one pair of numbers
+
+drum:
+  width_m: 0.220
+  capture_width_m: 0.180
+  offset_x_m: -0.060          # behind the axle, hence the blind leg
+  clearance_mm: 12.0
+
+obstacle:
+  tof_height_m: 0.100
+  tof_offset_x_m: 0.140
+  tof_threshold_m: 0.250
+
+chassis:
+  mass_kg: 4.5
+  footprint_length_m: 0.320
+  footprint_width_m: 0.260
+  planner_margin_m: 0.200
+
+power:
+  nominal_v: 11.1
+  warn_v: 10.2
+  cutoff_v: 9.6
+
+link:
+  port: sim://no-serial-port  # there is no port; the sim transport ignores this
+  baud: 115200
+  proto_version: 1
