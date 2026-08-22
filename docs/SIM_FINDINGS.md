@@ -119,15 +119,18 @@ See §5 — this is exactly the trap that section is about.
 ## 5. The two readings of "coverage" differ by a factor of three
 
 The unresolved question in CLAUDE.md §9 and §11, in numbers. Same arena, same
-overlap, same planner:
+overlap, same planner — and note these are for the arena the planner actually
+uses, the 3×3 m inset by `chassis.planner_margin_m` to 2.6×2.6 m:
 
 | `planner.swath_source` | Swath | Rows | Driving |
 |---|---|---|---|
-| `drum` (coverage = collection) | 0.22 m | 17 | 53.8 m |
-| `camera` (coverage = detection) | 0.64 m | 6 | 20.5 m |
+| `drum` (collection, mechanical width) | 0.22 m | 14 | 38.8 m |
+| `drum_capture` (collection, measured pickup width) | 0.18 m | 17 | 46.6 m |
+| `camera` (detection, frame width at lookahead) | 0.64 m | 5 | 15.1 m |
 
-A sweep that "covers the arena" under one reading leaves two thirds of it
-un-swept under the other. Every run records which was used, in
+A sweep that "covers the arena" under the detection reading drives **a third**
+as far as one under the collection reading, and leaves two thirds of the floor
+never passed over by a magnet. Every run records which was used, in
 `summary.json` under `fsm.swath_source`. Do not compare two runs without
 checking it.
 
