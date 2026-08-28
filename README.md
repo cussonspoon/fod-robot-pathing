@@ -14,6 +14,7 @@ Python package: `fodnav`. Console scripts: `fodnav-*`.
 | | |
 |---|---|
 | Design rules, conventions, ownership, scope | [`CLAUDE.md`](CLAUDE.md) |
+| What is built, what is blocking, the schedule | [`docs/STATUS.md`](docs/STATUS.md) |
 | Pi ↔ ESP32 serial contract | [`docs/protocol.md`](docs/protocol.md) |
 | Every number Teemy measures, and how | [`docs/HARDWARE.md`](docs/HARDWARE.md) |
 | What landed, when, and why | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
