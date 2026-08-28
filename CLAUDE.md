@@ -17,9 +17,12 @@ Read `docs/protocol.md` before touching anything in `src/fodnav/link/`.
 
 ## 0. Current state — read first
 
-**The repo is scaffolded and §4 exists.** Schedule items 0–6 are built and
-tested (§15); item 7, integration on the real chassis, is not. Do not
-re-scaffold. `docs/CHANGELOG.md` records what landed and when.
+**The repo is built and §4 exists. Do not re-scaffold.** Schedule items 0–6 are
+done; item 7, integration on the real chassis, is not.
+
+**`docs/STATUS.md` is the current state** — what is built, what is blocking,
+what is deliberately not built, and the schedule. It changes weekly; this file
+should not. If the two disagree, STATUS.md is right and this file needs fixing.
 
 The whole stack runs on a laptop with no camera, no Pi and no robot:
 
@@ -36,15 +39,13 @@ firmware (`sim/firmware.py`) implements `docs/protocol.md` including the
 watchdog, so the codec, the framing, the tick wraparound and the 300 ms timing
 are covered by ordinary unit tests rather than by a robot on a bench.
 
-**`config/robot.yaml` is still entirely `null`.** That is correct and it is the
-point: it is Teemy's file, the loader raises on any `null` a code path actually
-needs, and the error names the field and its `docs/HARDWARE.md` procedure. For
-a laptop run, `config/sim_robot.yaml` describes a robot that does not exist —
-every number in it is invented, which is legitimate only because nothing in it
-claims to be a measurement. **Never copy a value out of it into `robot.yaml`.**
-
-`docs/SIM_FINDINGS.md` has what the simulator says so far, with the caveats
-that matter. Two of its results bear directly on §11.
+**`config/robot.yaml` is still almost entirely `null`.** That is correct and it
+is the point: it is Teemy's file, the loader raises on any `null` a code path
+actually needs, and the error names the field and its `docs/HARDWARE.md`
+procedure. For a laptop run, `config/sim_robot.yaml` describes a robot that does
+not exist — every number in it is invented, which is legitimate only because
+nothing in it claims to be a measurement. **Never copy a value out of it into
+`robot.yaml`.**
 
 **Dependency baseline. Do not exceed it without asking.** Two CPU cores and a
 Raspberry Pi.
@@ -468,15 +469,10 @@ v5 says vision sets sweep *speed* over a boustrophedon coverage path. The adviso
 on 5 Aug described vision *steering* the robot to a thrown nail, and separately
 approved coverage in the same meeting. No ruling yet.
 
-Two simulation results are worth having in hand for that conversation, both in
-`docs/SIM_FINDINGS.md` and both caveated there. First, a full sweep of the 3×3 m
-arena is **46.6 m of driving** (on the drum-capture swath), ten times a single
-approach, and holding
-coverage above 90% needs the two wheels matched to about **0.2%** — which is
-tighter than a roll test alone delivers and is the whole reason for the spin
-test in `HARDWARE.md` §2.2. Second, the two readings of "coverage" give sweeps
-that differ by a factor of three (§9). Neither result decides the question.
-Both change what a coverage demo would have to promise.
+`docs/SIM_FINDINGS.md` §4 and §5 carry two measured results worth having in
+hand for that conversation: what calibration precision a coverage demo would
+actually require, and how far apart the two readings of "coverage" are. Neither
+decides the question. Both change what a coverage demo would have to promise.
 
 This does not block nav work, because `move_to()` is the executor for both:
 target-chasing feeds it a vision-derived waypoint, coverage feeds it a planned
@@ -590,47 +586,13 @@ Say no to these, in code review and in planning:
      contract, and it will be wrong before it is old.
      ============================================================ -->
 
-## 15. Current schedule (exam ~2 Sep 2026 — delete after)
+## 15. Where the schedule lives
 
-Ordered by dependency, not by importance.
+**`docs/STATUS.md`.** It holds the build order, what is done, what is blocking
+and in what order, what is deliberately not built, and the known gaps in the
+work itself. It is the volatile half of this document and it is kept separate
+so that this half can stay stable.
 
-0. ~~Scaffold per §0, and `tools/fake_detections.py`.~~ **Done.**
-1. ~~`frames.py`, `config.py`, `robot.yaml`, and the sim.~~ **Done.**
-2. ~~`ground.py` + `fodnav-calib-ground`.~~ **Done in software.** The
-   calibration itself cannot be taken until the mount is frozen and measured
-   (`HARDWARE.md` §3), and it is void the moment the mount moves.
-3. `docs/protocol.md` finalised **with Teemy** — *still open, and still the long
-   pole*. The codec is written against it and the simulated firmware implements
-   it, but that is one side agreeing with itself. He has not reviewed the
-   document, and it has been amended twice since drafting (§0). **Hand him the
-   doc.**
-4. ~~`control.py` + `move_to` + `fodnav-teleop`, validated in sim.~~ **Done.**
-5. ~~`servo.py` + the terminal blind leg.~~ **Done in sim**, 0.6–1.7 cm at the
-   drum with the error model on. Unproven on hardware, and the number it depends
-   on most — `camera.fov_near_limit_m` — has not been measured yet.
-6. ~~`planner/boustrophedon.py`.~~ **Done**, with the property tests §9 asks for.
-7. Integration on the real chassis, watchdog kill-test, one recorded run.
-   **Not started. Everything below is blocked on it.**
-
-Item 3 was always the long-pole item because it depends on someone else, and it
-still is. Nothing in this repo can un-block it.
-
-What is actually blocking now, in order:
-
-- **Teemy's measurements landing in `config/robot.yaml`.** Until then nothing
-  runs against real hardware — by design, loudly, with the procedure named.
-  `HARDWARE.md` §0 lists the three that block the most work.
-- **Teemy's review of `docs/protocol.md`**, including the two amendments.
-- **The camera mount frozen and measured**, which gates the ground calibration,
-  which gates every vision-driven behaviour on the real robot.
-- Then item 7: `fodnav-run --dry-run`, `fodnav-teleop` to check the §2.4 sign
-  conventions, the watchdog kill-test on the real chassis, one recorded run.
-
-Deliberately not built, and not to be built without a decision first:
-
-- **Speed control over `follow_path`.** If the adaptive-speed thesis survives
-  §11 it needs a mechanism that is not inference latency, and none is measured.
-  Building it now would be building it against the argument Hailo already
-  demolished.
-- **Diverting a coverage sweep to a detection.** That is a hybrid of the two
-  paradigms and inventing it here would answer §11 by accident.
+Also worth reading before starting: `docs/CHANGELOG.md` for the decisions
+behind what landed, and `docs/SIM_FINDINGS.md` for what the simulator says,
+with the caveats that matter.
