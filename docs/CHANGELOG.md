@@ -9,6 +9,98 @@ shared contract and needs telling, not just recording.
 
 ---
 
+## 0.2.0 — 2026-09-10 — the vision interface was never going to be MQTT
+
+`fod-vision v0.3.0` was released on 6 September: **a Python library you import,
+not a service you subscribe to.** No topic, no socket, no daemon. The MQTT
+schema this repo was built against — requested in CLAUDE.md §8, stubbed by
+`tools/fake_detections.py`, parsed by `link/detections.py`, and covered by 36
+tests — described an interface that never existed and was never going to.
+
+His guide and contract are vendored at
+`docs/vendor/fod-vision-v0.3.0-INTEGRATION.md`.
+
+### What that cost, and what it did not
+
+It cost the parser, its tests, the fake publisher and the sim's message shape.
+It did **not** cost the projection, the odometry, either controller, the
+planner, the FSM, the loop, the protocol codec or the chassis simulator.
+
+That is the rule in CLAUDE.md §0 paying for itself: every field name from the
+other side lived in one module, so a wrong guess about the whole interface was
+a one-module rewrite rather than a repo-wide one. **Keep doing that.**
+
+### Changed
+
+- **`link/detections.py` deleted; `link/vision.py` added.** His contract:
+  `Target(id, state, action, cls, conf, box, centroid)`, `VisionFrame`, and a
+  `LibraryVisionSource` that imports `fodcv` **lazily inside `start()`** — the
+  same quarantine `esp32.py` uses for pyserial, and what keeps `import fodnav`
+  working on a laptop.
+- **His `detail()` dict is the log format, verbatim.** Nav defines no wire
+  schema at all now. One shape, he owns it, and there is nothing left for the
+  two sides to disagree about.
+- **`target.py` lost roughly two thirds of itself.** He associates on an 80 px
+  radius, applies EMA confidence hysteresis (CONFIRM at 0.5, latched to 0.25)
+  and hands back stable track ids. Nav did all three. Two hysteresis loops in
+  series each lag the other, so ours went; what remains is projection,
+  staleness and ageing his measurement forward on odometry between his 30 Hz
+  and our 50 Hz.
+- **Filtering is on `state` and `action`, never `cls`.** There is no `nail`
+  class and never was; his are `bolt`/`nut`/`screw`/`washer`, they flip between
+  frames on one object, and they disappear entirely when the single-class arena
+  dataset lands. A test asserts a rename to `metal_fastener` changes nothing.
+- **`Target.ground_px` is `((x0+x1)/2, y1)`** — the bottom edge of `box`, not
+  his `centroid`. Same trap as CLAUDE.md §3, now one tempting field away.
+- **Camera switched to his real optics**: 1280×720, 66° lens.
+- **Python relaxed to `>=3.11`** and `paho-mqtt` dropped. The vision library
+  must load apt's 3.11 `picamera2` and `hailo_platform`, so nav runs in a 3.11
+  venv with `--system-site-packages`, in the same process. Nothing here ever
+  needed 3.12 — every file already parsed as 3.11.
+- **`tools/fake_detections.py` → `tools/fake_vision_log.py`**, writing his
+  `detail()` shape as JSONL for `fodnav-replay`.
+
+### The finding that matters
+
+**His 66° lens more than doubles the terminal blind leg.** Our fiction assumed a
+102° wide lens; Camera Module 3's standard lens is 66°, and a narrower lens sees
+less floor close in:
+
+| mount | near limit | blind leg |
+|---|---|---|
+| 0.22 m at 18° (the old fiction) | 0.381 m | **0.441 m** |
+| 0.18 m at 25° (now in `sim_robot.yaml`) | 0.230 m | 0.290 m |
+
+Holding the blind leg where it was needs a **lower, more steeply tilted mount** —
+25° is the edge of the 10–25° band `RESULT.md` allows. That makes PRD **O-3**
+the most contended number in the project: it stops his `lookahead` being a
+placeholder and stops our ground calibration being possible, and neither side
+moves without it.
+
+Side effect: the detection swath narrowed from ~3× the drum width to ~1.8×, so
+the §9 "which width is coverage" gap is smaller than the fiction implied.
+
+### Two bugs the work surfaced
+
+- **Replay silently dropped 57% of every log.** The source queue is bounded at
+  64 — correct for a live camera, where the oldest frames are the ones worth
+  losing — and replay inherited it. A 150-frame log read back as 64. Replay is
+  now unbounded, with a test that would have caught it.
+- **The JSONL log's write guard was too narrow.** It caught `OSError` and
+  `TypeError`; a closed handle raises `ValueError`. A broken log must never stop
+  a robot, so the guard is now deliberately broad.
+
+### Still true
+
+`config/robot.yaml` is still almost entirely `null`, and **nothing here has run
+against his library or on a Pi.** This is built against a published, measured
+spec rather than an invented one — a real improvement — but the first time his
+code and ours meet is still ahead. The cheapest way to close that gap is thirty
+seconds of recorded `detail()` output from his board, which `fodnav-replay`
+reads directly.
+
+---
+
 ## 0.1.0 — 2026-08-22
 
 First working version. The repo went from three documents to the whole of

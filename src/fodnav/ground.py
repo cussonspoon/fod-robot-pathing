@@ -396,14 +396,15 @@ class GroundProjector:
             return None
         return GroundPoint(x, y)
 
-    def project_detection(self, det, frame_size: Sequence[int] | None = None) -> GroundPoint | None:
-        """Project a :class:`~fodnav.link.detections.Detection`'s ground point.
+    def project_detection(self, target, frame_size: Sequence[int] | None = None) -> GroundPoint | None:
+        """Project a :class:`~fodnav.link.vision.Target`'s ground point.
 
-        The ground point of a detection is the **bottom-centre** of its box.
+        The ground point is the **bottom-centre** of the box, which is what
+        ``Target.ground_px`` returns -- never ``Target.centroid``.
         """
         if frame_size is not None:
             self.check_frame_size(frame_size)
-        u, v = det.ground_px
+        u, v = target.ground_px
         return self.project_pixel(u, v)
 
     def pixel_from_floor(self, x: float, y: float) -> tuple[float, float]:

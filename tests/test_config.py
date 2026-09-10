@@ -67,9 +67,12 @@ def test_shipped_nav_values_are_the_ones_the_contract_requires():
     nav = load_nav_config(NAV_YAML)
     # protocol.md section 6. Not a preference.
     assert nav.get("loop.rate_hz") == 50
-    # CLAUDE.md section 8: one target class, and unknown stays suppressed.
-    assert set(nav.get("detections.target_classes")) == {"nail", "screw", "bolt"}
-    assert "unknown" in nav.get("detections.ignore_classes")
+    # The vision side is a library, so what nav configures is what it passes to
+    # his constructor. Class filtering is gone: his classes are diagnostic and
+    # nav branches on state and action instead.
+    assert nav.get("detections.lookahead_lo") < nav.get("detections.lookahead_hi")
+    assert 0.0 <= nav.get("detections.conf") <= 1.0
+    assert nav.get("detections.hef").endswith(".hef")
 
 
 # -- null handling --------------------------------------------------------

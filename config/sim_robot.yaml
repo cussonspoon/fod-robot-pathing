@@ -27,25 +27,24 @@ drive:
   stopping_distance_m: 0.06
 
 camera:
-  height_m: 0.220
-  tilt_deg: 18.0              # inside the 10-25 band the CV repo synthesised
-  offset_x_m: 0.100
+  # Mount geometry is still undecided (PRD O-3; RESULT.md narrows it to 10-25 deg
+  # at 15-30 cm and no further). These are a plausible pick inside that band --
+  # low and steeply tilted, because with the real 66 deg lens a higher, flatter
+  # mount pushes the near limit out fast. At 0.22 m and 18 deg, which is what
+  # this file said while the camera was imaginary, the blind leg would be 0.44 m.
+  height_m: 0.180
+  tilt_deg: 25.0
+  offset_x_m: 0.050
   offset_y_m: 0.0
   roll_deg: 0.0
-  capture_width_px: 2304      # matches the frame_size in the CLAUDE.md §8 example
-  capture_height_px: 1296
-  # These three are DERIVED from the fictional optics in src/fodnav/sim/camera.py
-  # (a 102 deg lens at the mount geometry above), not chosen separately. A
-  # fictional robot whose declared field of view disagreed with the camera it
-  # actually publishes through would trigger the blind-leg handover at the wrong
-  # distance and teach us something false. tests/test_sim_camera.py pins them.
-  fov_near_limit_m: 0.2672    # bottom image row. Blind leg = this minus drum.offset_x_m
-  fov_far_limit_m: 1.600      # detector-limited, not geometry-limited: this camera
-                              # can see the horizon, which is what the horizon guard is for
-  fov_width_at_lookahead_m: 0.6377  # frame width on the floor at 0.3 m -- note it is
-                              # nearly 3x the drum width, which is the whole of the
-                              # CLAUDE.md §9 swath question, in one pair of numbers
-
+  capture_width_px: 1280      # his default; the frame his boxes are measured in
+  capture_height_px: 720
+  # Derived from the optics in src/fodnav/sim/camera.py, not chosen separately.
+  # tests/test_sim_camera.py pins them. Note the detection swath is now only
+  # ~1.8x the drum width, not ~3x as the 102 deg fiction implied.
+  fov_near_limit_m: 0.2297    # bottom image row. Blind leg = this minus drum.offset_x_m
+  fov_far_limit_m: 1.600      # detector-limited, not geometry-limited
+  fov_width_at_lookahead_m: 0.3931  # frame width on the floor at 0.3 m
 drum:
   width_m: 0.220
   capture_width_m: 0.180

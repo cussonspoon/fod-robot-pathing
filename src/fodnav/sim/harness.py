@@ -24,7 +24,7 @@ from ..control import MotionLimits
 from ..frames import Pose2D
 from ..fsm import Mode, NavFsm
 from ..ground import GroundProjector
-from ..link.detections import QueueDetectionSource
+from ..link.vision import QueueVisionSource
 from ..link.esp32 import Esp32Link
 from ..odom import Odometry
 from ..planner.boustrophedon import Rect
@@ -70,7 +70,7 @@ class SimHarness:
             on_log=self._on_firmware_log,
         )
         self.sim: UnicycleSim = self.firmware.sim
-        self.source = QueueDetectionSource()
+        self.source = QueueVisionSource()
         self.odom = Odometry.from_config(self.robot, pose=self.start_pose)
         self.odom.update(*self.sim.ticks)
 
@@ -110,7 +110,7 @@ class SimHarness:
             self._next_frame += self._vision_period
             if self.vision_dead_after_s is not None and t >= self.vision_dead_after_s:
                 return  # the camera process died; nav must notice and stop
-            self.source.offer(json.dumps(self.scene.render(self.sim.true_pose, t)))
+            self.source.offer(self.scene.render(self.sim.true_pose, t))
             self.frames_published += 1
 
     def _on_firmware_log(self, line) -> None:

@@ -1,60 +1,58 @@
-"""Association and confidence hysteresis: many boxes per second, one target.
+"""Turning his tracked pixels into one thing on the floor to drive at.
 
-A detector at 30 Hz produces a stream of independent guesses. A controller
-needs one thing to chase, that does not vanish because a single frame missed
-it and does not jump to a different object because that one scored 0.02 higher.
-This module is the difference.
+This module used to do nearest-neighbour association and confidence hysteresis
+itself, because the schema nav was written against carried nothing but raw
+boxes. **The real library does both already**, and better:
 
-Association is nearest-neighbour in the ``base`` frame with a gate, as
-CLAUDE.md section 8 specifies. Note the assumption that makes that adequate:
-the robot moves ~1 cm between frames at 30 Hz and 0.3 m/s, against a gate of
-20 cm, so not compensating for the robot's own motion costs nothing. If sweep
-speed ever rises far enough that inter-frame motion approaches the gate, the
-fix is to carry tracks in ``odom`` instead -- 33 ms of odometry drift is
-nothing, so it would not compromise the servo's drift-immunity -- but it is not
-needed at these speeds and the simpler thing is the specified thing.
+* it matches tracks in pixels on an 80 px radius and hands back a **stable
+  ``id``** that never repeats, so "the same screw across an approach" is his
+  answer, not ours;
+* it smooths confidence with an EMA and latches ``CONFIRM`` at 0.5 until the
+  score falls under 0.25 -- the hysteresis pair this module used to own.
 
-Confidence is hysteretic: a box must clear ``acquire_conf`` to start a track
-and only has to stay above ``drop_conf`` to keep it. One threshold would make a
-detector sitting near it flicker, and a flickering target thrashes the FSM.
+So what is left here is only the part he will not do, and says so:
 
-The CV repo has a tracker with hysteresis whose approach is worth reading
-before changing this one.
+* **project his pixels to metres on the floor** (``ground.py``), and
+* **age that measurement forward on odometry**, because his thread runs at 30 Hz
+  and our control loop at 50 Hz, so most ticks are working from a measurement up
+  to 33 ms old -- about a centimetre of robot motion, which is enough to move
+  where the terminal blind leg latches.
+
+Re-implementing his tracking on top of his tracking would be two hysteresis
+loops in series, each lagging the other. Do not add one back.
 """
 
 from __future__ import annotations
 
-import itertools
 import math
 from dataclasses import dataclass, field
 
 from .config import Config
 from .frames import Pose2D
-from .ground import GroundPoint
+from .ground import GroundPoint, GroundProjector
+from .link.vision import CONFIRM, PICK, Target, VisionFrame, select_targets
 
-__all__ = ["Track", "TrackerParams", "TargetTracker"]
-
-_ids = itertools.count(1)
+__all__ = ["Track", "TargetSet", "TargetParams"]
 
 
 @dataclass
 class Track:
-    """One object being followed across frames, in the ``base`` frame."""
+    """One of his targets, projected onto the floor.
 
+    ``x``/``y`` are metres in ``base`` **as measured**, paired with the odometry
+    pose at that moment so the estimate can be carried forward.
+    """
+
+    id: int                      # his id, stable and never reused
     x: float
     y: float
     conf: float
-    id: int = field(default_factory=lambda: next(_ids))
-    hits: int = 1
-    misses: int = 0
-    confirmed: bool = False
-    first_seen: float = 0.0
-    last_seen: float = 0.0
-    cls: str = ""
-    #: Where odometry thought the robot was when this track was last measured.
-    #: Kept so that a consumer running faster than the detector can age the
-    #: estimate forward -- which is what ``t_capture`` is in the message for.
-    odom_pose: Pose2D = field(default_factory=Pose2D)
+    cls: str                     # diagnostic only -- never branch on it
+    state: str
+    action: str
+    odom_pose: Pose2D
+    last_seen: float
+    first_seen: float
 
     @property
     def range_m(self) -> float:
@@ -74,123 +72,88 @@ class Track:
     def predict_base(self, odom_now: Pose2D) -> GroundPoint:
         """This track in the *current* base frame, aged forward on odometry.
 
-        The control loop runs at 50 Hz and the detector publishes at 30, so on
-        most ticks the newest measurement is up to 33 ms old -- about a
-        centimetre of robot motion, which is enough to shift where the blind
-        leg latches. Rotating the stale estimate into the current frame costs
-        nothing and uses only tens of milliseconds of odometry, so it does not
-        compromise the servo's independence from drift.
+        Uses only the tens of milliseconds since the measurement, so it does not
+        compromise the servo's independence from drift -- that independence
+        comes from re-measuring every frame, not from refusing to use odometry
+        at all.
         """
-        world_pt = self.odom_pose.transform_point(self.x, self.y)
-        x, y = odom_now.inverse_transform_point(*world_pt)
+        world = self.odom_pose.transform_point(self.x, self.y)
+        x, y = odom_now.inverse_transform_point(*world)
         return GroundPoint(x, y)
 
 
 @dataclass(frozen=True)
-class TrackerParams:
-    acquire_conf: float = 0.5
-    drop_conf: float = 0.3
-    assoc_max_jump_m: float = 0.2
-    min_hits: int = 3
-    max_misses: int = 5
+class TargetParams:
+    """What is left to tune on this side. Deliberately short.
+
+    ``acquire_conf``, ``drop_conf``, ``min_hits``, ``max_misses`` and
+    ``assoc_max_jump_m`` used to live here. They are his now.
+    """
+
+    #: Drop a projected track this long after its last sighting. A backstop for
+    #: frames stopping altogether; his own tracker drops a track after 5 misses.
+    max_age_s: float = 0.5
 
     @classmethod
-    def from_config(cls, nav: Config) -> "TrackerParams":
-        return cls(
-            acquire_conf=nav.get("detections.acquire_conf"),
-            drop_conf=nav.get("detections.drop_conf"),
-            assoc_max_jump_m=nav.get("detections.assoc_max_jump_m"),
-            min_hits=nav.get("detections.min_hits"),
-            max_misses=nav.get("detections.max_misses"),
-        )
+    def from_config(cls, nav: Config) -> "TargetParams":
+        return cls(max_age_s=nav.get("detections.max_age_s"))
 
 
-class TargetTracker:
-    """Nearest-neighbour association with a gate, plus confidence hysteresis."""
+class TargetSet:
+    """His confirmed targets, on the floor, in the robot's frame."""
 
-    def __init__(self, params: TrackerParams | None = None) -> None:
-        self.params = params or TrackerParams()
-        self.tracks: list[Track] = []
+    def __init__(self, params: TargetParams | None = None) -> None:
+        self.params = params or TargetParams()
+        self.tracks: dict[int, Track] = {}
+        self.n_projection_rejects = 0
+        self.n_filtered_out = 0
 
     def reset(self) -> None:
         self.tracks.clear()
 
     def update(
         self,
-        observations: list[tuple[GroundPoint, float, str]],
+        frame: VisionFrame,
+        projector: GroundProjector,
+        odom_pose: Pose2D,
         now: float,
-        odom_pose: Pose2D = Pose2D(),
     ) -> list[Track]:
-        """Fold one frame's projected detections in. Returns confirmed tracks.
+        """Fold one frame in. Returns the live tracks.
 
-        ``observations`` are already projected to the floor and already
-        class-filtered -- this module has no opinion about which classes are
-        targets, because CLAUDE.md section 8 has a strong one and it belongs
-        where the message is parsed.
+        Filtering is on ``state`` and ``action`` only -- his class names are
+        diagnostic and are going away.
         """
-        p = self.params
-        unmatched = list(self.tracks)
-        matched: set[int] = set()
-
-        # Greedy nearest-neighbour, closest pair first, so that two detections
-        # competing for one track resolve the way a human would expect.
-        pairs: list[tuple[float, int, Track]] = []
-        for oi, (pt, conf, _cls) in enumerate(observations):
-            for tr in unmatched:
-                d = math.hypot(pt.x - tr.x, pt.y - tr.y)
-                if d <= p.assoc_max_jump_m:
-                    pairs.append((d, oi, tr))
-        pairs.sort(key=lambda t: t[0])
-
-        claimed_tracks: set[int] = set()
-        for _d, oi, tr in pairs:
-            if oi in matched or tr.id in claimed_tracks:
+        projector.check_frame_size(frame.frame_size)
+        kept: set[int] = set()
+        for t in select_targets(frame, states=(CONFIRM,), actions=(PICK,)):
+            point = projector.project_pixel(*t.ground_px)
+            if point is None:
+                # Above the horizon, behind, or beyond the calibrated patch.
+                self.n_projection_rejects += 1
                 continue
-            pt, conf, cls = observations[oi]
-            tr.x, tr.y, tr.conf, tr.cls = pt.x, pt.y, conf, cls
-            tr.odom_pose = odom_pose
-            tr.hits += 1
-            tr.misses = 0
-            tr.last_seen = now
-            if tr.hits >= p.min_hits and conf >= p.drop_conf:
-                tr.confirmed = True
-            matched.add(oi)
-            claimed_tracks.add(tr.id)
-
-        # Anything left over is a new object -- but only if it is confident
-        # enough to be worth starting a track for.
-        for oi, (pt, conf, cls) in enumerate(observations):
-            if oi in matched or conf < p.acquire_conf:
-                continue
-            self.tracks.append(
-                Track(x=pt.x, y=pt.y, conf=conf, cls=cls, first_seen=now, last_seen=now,
-                      odom_pose=odom_pose, confirmed=p.min_hits <= 1)
+            kept.add(t.id)
+            existing = self.tracks.get(t.id)
+            self.tracks[t.id] = Track(
+                id=t.id, x=point.x, y=point.y, conf=t.conf, cls=t.cls,
+                state=t.state, action=t.action, odom_pose=odom_pose, last_seen=now,
+                first_seen=existing.first_seen if existing else now,
             )
+        self.n_filtered_out += len(frame.targets) - len(kept)
+        self.tracks = {
+            i: tr for i, tr in self.tracks.items()
+            if tr.age_s(now) <= self.params.max_age_s
+        }
+        return list(self.tracks.values())
 
-        # Tracks nobody claimed this frame. A confirmed track survives on the
-        # loose threshold; an unconfirmed one is dropped as soon as it misses,
-        # because a one-frame flicker is not an object.
-        for tr in unmatched:
-            if tr.id in claimed_tracks:
-                continue
-            tr.misses += 1
-            if tr.conf < p.drop_conf or tr.misses > p.max_misses:
-                tr.confirmed = False
+    def best(self, odom_now: Pose2D, max_range_m: float = float("inf")) -> Track | None:
+        """The nearest track within range, or ``None``.
 
-        self.tracks = [
-            tr for tr in self.tracks if tr.misses <= p.max_misses and tr.conf >= p.drop_conf
-        ]
-        return self.confirmed()
-
-    def confirmed(self) -> list[Track]:
-        return [t for t in self.tracks if t.confirmed]
-
-    def best(self, max_range_m: float = float("inf")) -> Track | None:
-        """The nearest confirmed target within range, or ``None``.
-
-        Nearest rather than most-confident: the robot is going to drive to it,
-        and the nearest one is both the cheapest to reach and the one most
-        likely to still be there when it arrives.
+        Nearest rather than most confident: it is the cheapest to reach and the
+        one most likely still to be there on arrival.
         """
-        candidates = [t for t in self.confirmed() if t.range_m <= max_range_m]
-        return min(candidates, key=lambda t: t.range_m, default=None)
+        best_track, best_range = None, float("inf")
+        for tr in self.tracks.values():
+            r = tr.predict_base(odom_now).range_m
+            if r < best_range and r <= max_range_m:
+                best_range, best_track = r, tr
+        return best_track

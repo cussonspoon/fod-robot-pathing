@@ -407,35 +407,27 @@ NAV_SCHEMA: dict[str, Field] = {
         minimum=0.05, maximum=60.0,
     ),
     # -- detections --------------------------------------------------------
-    "detections.topic": Field(
-        str, "MQTT topic the vision process publishes on", "", "CLAUDE.md §8",
+    "detections.hef": Field(
+        str, "path to the compiled .hef his loader reads its neighbours from", "",
+        "docs/vendor/fod-vision-v0.3.0-INTEGRATION.md \u00a72 -- the two levels above it matter",
     ),
-    "detections.broker_host": Field(str, "MQTT broker host", "", "loopback on the Pi"),
-    "detections.broker_port": Field(int, "MQTT broker port", "", "", minimum=1, maximum=65535),
-    "detections.acquire_conf": Field(
-        float, "confidence needed to start trusting a detection", "", "tuned; hysteresis pair",
+    "detections.lookahead_lo": Field(
+        float, "top of his zone_blocked strip, as a fraction of frame height", "",
+        "his default 0.5; a placeholder until the mount is measured (PRD O-3)",
         minimum=0.0, maximum=1.0,
     ),
-    "detections.drop_conf": Field(
-        float, "confidence below which an already-tracked target is dropped", "",
-        "tuned; hysteresis pair", minimum=0.0, maximum=1.0,
+    "detections.lookahead_hi": Field(
+        float, "bottom of his zone_blocked strip, as a fraction of frame height", "",
+        "his default 1.0", minimum=0.0, maximum=1.0,
     ),
-    "detections.target_classes": Field(
-        list, "class names treated as one target class (CLAUDE.md §8: nail/screw/bolt)", "",
-        "CLAUDE.md §8 -- localisation is solved, naming is not",
+    "detections.conf": Field(
+        float, "host-side score filter he applies before tracking", "", "his default 0.25",
+        minimum=0.0, maximum=1.0,
     ),
-    "detections.ignore_classes": Field(
-        list, "class names discarded on receipt", "", "CLAUDE.md §8 -- 'unknown' fires on furniture",
-    ),
-    "detections.assoc_max_jump_m": Field(
-        float, "nearest-neighbour association gate in the base frame", "m", "tuned",
-        minimum=0.01, maximum=5.0,
-    ),
-    "detections.min_hits": Field(
-        int, "associated frames before a track is acted on", "frames", "tuned", minimum=1, maximum=100,
-    ),
-    "detections.max_misses": Field(
-        int, "unassociated frames before a track is dropped", "frames", "tuned", minimum=1, maximum=1000,
+    "detections.max_age_s": Field(
+        float, "drop a projected track this long after its last sighting", "s",
+        "nav's backstop; his tracker drops after 5 missed frames",
+        minimum=0.02, maximum=10.0,
     ),
     # -- planner -----------------------------------------------------------
     "planner.swath_source": Field(
@@ -534,10 +526,10 @@ def _pairwise_checks(schema_name: str) -> list[tuple[tuple[str, ...], Callable[.
              "drive.wheel_radius_m looks large against drive.track_width_m -- check units"),
         ]
     return [
-        (("detections.drop_conf", "detections.acquire_conf"),
-         lambda drop, acq: None if drop <= acq else
-         "detections.drop_conf must not exceed detections.acquire_conf "
-         "(they are a hysteresis pair: acquire high, drop low)"),
+        (("detections.lookahead_lo", "detections.lookahead_hi"),
+         lambda lo, hi: None if lo < hi else
+         "detections.lookahead_lo must be above detections.lookahead_hi in the frame "
+         "(they are a (lo, hi) fraction of frame height, top-down)"),
         (("control.heading_tolerance_rad", "control.turn_in_place_rad"),
          lambda tol, turn: None if tol < turn else
          "control.heading_tolerance_rad must be below control.turn_in_place_rad"),

@@ -1,10 +1,11 @@
-"""Links to the two processes this one does not own.
+"""Links to the two things this process does not own.
 
-``detections`` subscribes to the vision process (Bthcorn's, MQTT, JSON).
-``esp32`` speaks the serial protocol to the firmware (Teemy's).
+``vision`` adapts Bthcorn's ``fod-vision`` library -- which runs a capture
+thread inside this process, and is emphatically not a service. ``esp32`` speaks
+the serial protocol to Teemy's firmware.
 
-Both of those specs are proposals, not agreements: docs/protocol.md has not
-been reviewed by Teemy and the detection schema has not been implemented by
-Bthcorn. Build against both, but keep every field name inside these two
-modules so that a change to either is a one-file change.
+Both of those interfaces are somebody else's. Keep every field name from them
+inside these two modules so that a change on either side is a one-file change
+here. The MQTT detection schema this repo was first written against never
+existed; that lesson is why the rule matters.
 """

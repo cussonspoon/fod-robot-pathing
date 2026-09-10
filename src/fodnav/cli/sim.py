@@ -95,8 +95,9 @@ def _report(harness, summary, stats) -> None:
     print(f"  driven        {summary['distance_driven_m']:8.2f} m")
     print(f"  odom error    {summary['odometry_error_m'] * 100:8.1f} cm at the end")
     print(f"  watchdog      {summary['watchdog_trips']} trips, {stats.overruns} loop overruns")
+    d = summary["detections"]
     print(f"  vision        {summary['frames_published']} frames published, "
-          f"{summary['detections']['parsed']} parsed, {summary['detections']['malformed']} malformed")
+          f"{d['frames']} read, {d['targets_seen']} targets, {d['errors']} error frames")
     if "target_misses_m" in summary:
         for (x, y), miss in zip(harness.targets, summary["target_misses_m"]):
             verdict = "caught" if miss < harness._drum_w / 2 else "MISSED"

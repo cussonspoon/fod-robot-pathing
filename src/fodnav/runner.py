@@ -29,7 +29,7 @@ from typing import Callable, Protocol
 from .config import Config
 from .control import Command
 from .fsm import NavFsm, NavInputs, State
-from .link.detections import DetectionSource
+from .link.vision import VisionSource
 from .link.esp32 import Esp32Link, Telemetry
 from .odom import Odometry, TelemetryCrossCheck
 from .runlog import RunLog
@@ -93,7 +93,7 @@ class ControlLoop:
     robot: Config
     nav: Config
     link: Esp32Link
-    detections: DetectionSource
+    detections: VisionSource
     fsm: NavFsm
     odom: Odometry
     clock: Clock = field(default_factory=RealClock)
