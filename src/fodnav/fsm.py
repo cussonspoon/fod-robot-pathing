@@ -34,11 +34,11 @@ from .config import Config
 from .control import Command, Gains, MotionLimits, PathFollower
 from .frames import Pose2D
 from .ground import GroundProjector
-from .link.detections import DetectionFrame, select_targets
 from .link.esp32 import Telemetry
+from .link.vision import VisionFrame
 from .planner.boustrophedon import Rect, plan, row_spacing, swath_width_from_config
 from .servo import ServoGains, ServoGeometry, ServoState, VisualServo
-from .target import TargetTracker, TrackerParams
+from .target import TargetParams, TargetSet
 
 __all__ = ["Mode", "State", "NavInputs", "NavFsm"]
 
@@ -66,7 +66,7 @@ class NavInputs:
 
     now: float                                  # monotonic seconds
     odom_pose: Pose2D
-    frames: list[DetectionFrame] = field(default_factory=list)
+    frames: list[VisionFrame] = field(default_factory=list)
     vision_age_s: float = float("inf")
     telemetry: Telemetry | None = None
 
@@ -88,13 +88,9 @@ class NavFsm:
 
         self.limits = MotionLimits.from_config(robot)
         self.gains = Gains.from_config(nav)
-        self.tracker = TargetTracker(TrackerParams.from_config(nav))
+        self.tracker = TargetSet(TargetParams.from_config(nav))
         self.vision_timeout_s = nav.get("loop.vision_timeout_s")
         self.max_valid_range_m = robot.get("camera.fov_far_limit_m")
-
-        self._target_classes = nav.get("detections.target_classes")
-        self._ignore_classes = nav.get("detections.ignore_classes")
-        self._drop_conf = nav.get("detections.drop_conf")
 
         self.servo: VisualServo | None = None
         self.follower: PathFollower | None = None
@@ -106,6 +102,7 @@ class NavFsm:
         self.n_targets_collected = 0
         self.n_frames_seen = 0
         self.n_projection_rejects = 0
+        self.vision_error: str | None = None
 
         if self.mode is Mode.TARGET:
             self.servo = VisualServo(
@@ -161,26 +158,28 @@ class NavFsm:
         return self._coverage_mode(inputs)
 
     def _ingest(self, inputs: NavInputs) -> None:
-        """Detections in, tracks out. The only place perception enters."""
+        """Frames in, floor-frame tracks out. The only place perception enters.
+
+        Class filtering and association are not done here any more -- the vision
+        library does both, and re-doing them would put two hysteresis loops in
+        series. What is left is projection, which he explicitly will not do.
+        """
         for frame in inputs.frames:
             self.n_frames_seen += 1
-            observations = []
-            for det in select_targets(
-                frame, self._target_classes, self._ignore_classes, self._drop_conf
-            ):
-                if self.projector is None:
-                    continue
-                # Assert the resolution matches what the homography was
-                # calibrated at. If it does not, every projection is silently
-                # wrong, so this is allowed to raise into the control loop --
-                # which stops the robot, which is the correct outcome.
-                self.projector.check_frame_size(frame.frame_size)
-                point = self.projector.project_detection(det)
-                if point is None:
-                    self.n_projection_rejects += 1
-                    continue
-                observations.append((point, det.conf, det.cls))
-            self.tracker.update(observations, inputs.now, inputs.odom_pose)
+            if frame.error:
+                # A dead camera raises on his side; the source turns that into a
+                # frame carrying the reason. Record it -- the safety check stops
+                # the robot on it, and the run log gets a cause rather than a gap.
+                self.vision_error = frame.error
+                continue
+            if self.projector is None:
+                continue
+            # The frame-size assertion lives inside TargetSet.update. If the
+            # resolution does not match the calibration, every projection is
+            # silently wrong, so it is allowed to raise into the control loop --
+            # which stops the robot, which is the correct outcome.
+            self.tracker.update(frame, self.projector, inputs.odom_pose, inputs.now)
+        self.n_projection_rejects = self.tracker.n_projection_rejects
 
     def _safety(self, inputs: NavInputs) -> Command | None:
         t = inputs.telemetry
@@ -200,6 +199,11 @@ class NavFsm:
             if t.flags.battery_low and self.nav.get("safety.stop_on_battery_low"):
                 return self._to(State.STOPPED, Command(reason="battery low"))
 
+        if self.vision_error:
+            return self._to(
+                State.STOPPED,
+                Command(reason=f"vision failed: {self.vision_error}"),
+            )
         if inputs.vision_age_s > self.vision_timeout_s:
             # No message at all for this long. An empty dets list would have
             # reset this: "the floor is clear" is a report, silence is not.
@@ -214,7 +218,7 @@ class NavFsm:
 
     def _target_mode(self, inputs: NavInputs) -> Command:
         assert self.servo is not None
-        best = self.tracker.best(max_range_m=self.max_valid_range_m)
+        best = self.tracker.best(inputs.odom_pose, max_range_m=self.max_valid_range_m)
 
         if self.servo.finished:
             # Arrived, or lost it. Either way go back to watching: "throw
@@ -275,7 +279,7 @@ class NavFsm:
             "frames_seen": self.n_frames_seen,
             "projection_rejects": self.n_projection_rejects,
             "tracks": len(self.tracker.tracks),
-            "confirmed": len(self.tracker.confirmed()),
+            "vision_error": self.vision_error,
         }
         if self.mode is Mode.TARGET and self.servo is not None:
             out["servo_state"] = self.servo.state.value

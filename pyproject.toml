@@ -3,16 +3,25 @@ name = "fod-robot-pathing"
 version = "0.1.0"
 description = "Navigation, path planning and motion control for the FOD robot."
 readme = "README.md"
-requires-python = ">=3.12,<3.13"
+requires-python = ">=3.11,<3.13"
 
 # Dependency baseline is fixed by CLAUDE.md section 2: two CPU cores and a
 # Raspberry Pi. Ask before adding to this list.
 #   opencv-python-headless, not opencv-python -- the only runtime OpenCV call is
 #   findHomography and the GUI build drags in X11 for nothing.
+#   paho-mqtt is gone: the vision side turned out to be a library, not a topic.
+#
+# Python 3.11, not 3.12. The vision package must load apt's picamera2 and
+# hailo_platform, which are built against the Pi's system 3.11, so the venv it
+# runs in has to be 3.11 with --system-site-packages. Nothing in this package
+# ever needed 3.12; the old pin was arbitrary.
+#
+# fod-vision itself is NOT declared here. It is installed into the Pi's system
+# interpreter from Bthcorn's release, it only exists on hardware, and
+# link/vision.py imports it lazily so this package stays importable on a laptop.
 dependencies = [
     "numpy>=2.0",
     "pyserial>=3.5",
-    "paho-mqtt>=2.0",
     "pyyaml>=6.0",
     "opencv-python-headless>=4.10",
 ]

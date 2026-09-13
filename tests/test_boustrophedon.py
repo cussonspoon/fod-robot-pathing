@@ -275,8 +275,9 @@ def test_the_two_candidate_swaths_differ_enough_to_matter():
     rect = Rect(0, 0, 3, 3)
     rows_drum = row_count(3.0, row_spacing(drum, 0.15))
     rows_camera = row_count(3.0, row_spacing(camera, 0.15))
-    assert rows_drum > 2 * rows_camera, (
-        "the collection and detection readings of 'coverage' give sweeps that "
-        "differ by more than a factor of two -- which is why the run log has to "
-        "say which was used"
+    assert rows_drum > 1.4 * rows_camera, (
+        "the collection and detection readings of 'coverage' still give "
+        "materially different sweeps -- which is why the run log has to say "
+        "which was used. The gap narrowed from ~3x to ~1.8x when the camera "
+        "stopped being a fictional 102 deg lens and became the real 66 deg one."
     )

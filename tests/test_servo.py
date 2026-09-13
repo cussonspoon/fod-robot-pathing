@@ -17,13 +17,13 @@ from fodnav.config import load_nav_config, load_robot_config
 from fodnav.control import Gains, MotionLimits, WaypointController
 from fodnav.frames import Pose2D
 from fodnav.ground import GroundPoint, GroundProjector
-from fodnav.link.detections import parse_message, select_targets
+from fodnav.link.vision import parse_detail
 from fodnav.odom import Odometry
 from fodnav.servo import ServoGains, ServoGeometry, ServoState, VisualServo
 from fodnav.sim.camera import SimCamera
 from fodnav.sim.scene import SceneNoise, SimScene
 from fodnav.sim.unicycle import SimParams, UnicycleSim
-from fodnav.target import TargetTracker, TrackerParams
+from fodnav.target import TargetParams, TargetSet
 
 DT = 0.02
 VISION_DT = 1.0 / 30.0
@@ -192,7 +192,7 @@ def run_demo(robot, nav, target_xy, params=None, noise=None, start=Pose2D(), sec
     sim = UnicycleSim(robot, params or SimParams.from_config(nav), pose=start)
     odo = Odometry.from_config(robot, pose=start)
     odo.update(*sim.ticks)
-    tracker = TargetTracker(TrackerParams.from_config(nav))
+    tracker = TargetSet(TargetParams.from_config(nav))
     servo = VisualServo(ServoGains.from_config(nav), MotionLimits.from_config(robot),
                         ServoGeometry.from_config(robot, nav))
 
@@ -201,20 +201,9 @@ def run_demo(robot, nav, target_xy, params=None, noise=None, start=Pose2D(), sec
     while t < seconds:
         if t >= next_frame:
             next_frame += VISION_DT
-            frame = parse_message(json.dumps(scene.render(sim.true_pose, t)))
-            proj.check_frame_size(frame.frame_size)
-            observations = []
-            for d in select_targets(
-                frame,
-                nav.get("detections.target_classes"),
-                nav.get("detections.ignore_classes"),
-                nav.get("detections.drop_conf"),
-            ):
-                g = proj.project_detection(d)
-                if g is not None:
-                    observations.append((g, d.conf, d.cls))
-            tracker.update(observations, t, odo.pose)
-        best = tracker.best()
+            frame = parse_detail(scene.render(sim.true_pose, t))
+            tracker.update(frame, proj, odo.pose, t)
+        best = tracker.best(odo.pose)
         cmd = servo.update(best.predict_base(odo.pose) if best else None, odo.pose, t)
         if cmd.done:
             break

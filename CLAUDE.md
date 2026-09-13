@@ -51,9 +51,13 @@ nothing in it claims to be a measurement. **Never copy a value out of it into
 Raspberry Pi.
 
 ```
-runtime: numpy, pyserial, paho-mqtt, pyyaml, opencv-python-headless
+runtime: numpy, pyserial, pyyaml, opencv-python-headless
 dev:     pytest, matplotlib (sim plots only, never imported by runtime code)
 ```
+
+`paho-mqtt` is gone: the vision side turned out to be a library, not a topic.
+`fod-vision` is deliberately **not** declared -- it is installed into the Pi's
+system interpreter from Bthcorn's release and imported lazily (§2).
 
 `opencv-python-headless`, not `opencv-python` — the only OpenCV call in the
 runtime is `findHomography`, and the GUI build drags in X11 for nothing. No
@@ -61,11 +65,14 @@ scipy: `numpy` covers every linear-algebra need here. No robotics framework, no
 ROS, no async runtime. If something seems to need one, that is a signal the
 design drifted, not that a dependency is missing.
 
-**Two specs in this repo are proposals, not agreements.**
-`docs/protocol.md` has not been reviewed by Teemy and the detection schema in §8
-has not been implemented by Bthcorn. Build against both, but write the code so
-a change to either touches one module (`link/esp32.py`, `link/detections.py`)
-and nothing else. Do not scatter field names through the codebase.
+**One spec here is still a proposal.** `docs/protocol.md` has not been reviewed
+by Teemy. The other one is no longer a proposal at all: the vision interface is
+Bthcorn's, published and measured, and vendored at `docs/vendor/`.
+
+Keep every field name from either side inside one module -- `link/esp32.py` and
+`link/vision.py`. **That rule is why the vision surprise cost a day and not a
+week.** When the MQTT schema turned out never to have existed, the parser, the
+tests and the sim changed; nothing else did.
 
 `docs/protocol.md` has been amended twice since it was drafted, both times
 because writing the codec against it found a contradiction. Neither bumps
@@ -94,12 +101,23 @@ portable. If you find yourself wanting to add extrinsics to the CV repo, stop.
 
 ## 2. Hard constraints (do not design around these; design *within* them)
 
-**Two Python interpreters, and they cannot be merged.** `pi/camera_hailo.py` runs
-on the Pi's **system** Python 3.11 because `python3-picamera2` is an apt package
-built against 3.11; the project venv is 3.12, a different C ABI, and no amount of
-pip will fix it. Consequence: **vision and navigation are separate OS processes.**
-Do not propose a single-process design. Do not add `picamera2` or
-`hailo_platform` to this repo's dependencies.
+**The vision side is a library, not a service.** `fod-vision` is a wheel you
+import: it runs its own capture thread, and you read it when your loop gets
+round to it. There is no topic, no socket and no daemon. This repo was first
+written against an MQTT schema that was never implemented and never would be --
+see `docs/vendor/fod-vision-v0.3.0-INTEGRATION.md` for what actually shipped.
+
+**One interpreter, and it is the system's 3.11.** `picamera2` and
+`hailo_platform` are apt packages built against the Pi's system Python 3.11, so
+anything importing the vision library must be 3.11 too. Nav therefore runs in a
+**3.11 venv created with `--system-site-packages`**, in the same process as
+vision. Nothing here ever needed 3.12; that pin was arbitrary and is gone.
+
+**Do not add `picamera2`, `hailo_platform` or `fod-vision` to this repo's
+dependencies.** They exist only on the Pi. `link/vision.py` imports the library
+**lazily inside `start()`**, the same way `esp32.py` imports pyserial, which is
+what keeps `import fodnav` working on a laptop and the whole test suite
+hardware-free. Breaking that quarantine breaks development.
 
 **Two CPU cores, not four.** The CV repo measured the two-core case deliberately
 as the budget for nav + SLAM: Hailo INT8 holds 17.8 ms whether given four cores
@@ -182,25 +200,31 @@ the `I` handshake in `docs/protocol.md` asserts the two sides agree.
 
 ## 4. Architecture
 
-Three processes on the Pi.
+**Two processes, and one of them is not ours.**
 
 ```
-  camera_hailo.py                fodnav-run                   ESP32
-  (system py3.11)                (venv py3.12)                (firmware)
-        |                             |                            |
-        |  MQTT fod/detections        |   UART, docs/protocol.md   |
-        |  JSON, ~30 Hz          -->  |  V/S/E/D cmds @50 Hz  -->  |
-        |                             |  <-- T telemetry @50 Hz    |
+  fodnav-run                       (Pi 5, system python3.11 venv)
+  |
+  |-- fod-vision (Bthcorn's)       capture thread @30 FPS -> Hailo-8 -> tracker
+  |        ^  vision.detail()      pixels, stable track ids, CONFIRM/CAUTION
+  |
+  |-- ground.py                    pixels -> metres in base   [ours; he will not]
+  |-- fsm + control @50 Hz
+           |  UART, docs/protocol.md
+           v
+        ESP32                      wheel PID, PWM, watchdog   (Teemy's)
 ```
 
-MQTT because Mosquitto is already in the stack and loopback publish is
-sub-millisecond. A UNIX domain socket is an acceptable swap if jitter ever
-matters; the subscriber is behind an interface in `link/detections.py` precisely
-so that swap is local.
+His thread and our loop run at different rates and neither waits for the other,
+so a slow tick cannot stall capture and a slow frame cannot stall the tick.
 
-Every detection message received is appended to a JSONL log. `fodnav-replay`
-feeds a log back through the same interface, so the whole nav stack is testable
-against real vision output with no camera, no Pi, and no robot.
+Every frame read is appended to a JSONL log **in his `detail()` shape,
+verbatim** -- nav defines no wire schema of its own, which is precisely why the
+two sides cannot drift apart over a field name again. `fodnav-replay` feeds a
+log back through the same interface, so the whole nav stack is testable against
+real detector output with no camera, no Pi and no robot. That replay is the
+cheapest real integration test available and it has not been run against a real
+recording yet.
 
 ### Package layout
 
@@ -211,13 +235,13 @@ src/fodnav/
   odom.py            differential-drive odometry from encoder ticks
   control.py         go_to_pose, pure pursuit, unicycle -> (v, omega) -> wheels
   servo.py           bearing-based visual servo controller
-  target.py          association + confidence hysteresis -> one thing to chase
+  target.py          his tracks projected onto the floor, aged on odometry
   planner/
     boustrophedon.py rect + swath -> waypoint list. PURE FUNCTION.
     coverage.py      swept-cell bookkeeping
   link/
     esp32.py         protocol codec + serial transport + watchdog feed
-    detections.py    MQTT subscriber, JSONL logger, replay source
+    vision.py        his library adapted; JSONL logger; replay source
   sim/
     unicycle.py      kinematic sim with realistic odometry error
     camera.py        a fictional lens; floor metres -> pixels
@@ -233,7 +257,8 @@ tests/
 config/robot.yaml       measured constants, Teemy's, all null until he measures
 config/nav.yaml         gains, tolerances, modes. Nav's.
 config/sim_robot.yaml   a robot that does not exist
-docs/protocol.md
+docs/protocol.md        the contract with the firmware, ours to define
+docs/vendor/            the contract with the vision library, his to define
 ```
 
 Three of those are not in the original plan and each earns its place:
@@ -350,63 +375,67 @@ Reject rather than returning a huge or negative range.
 
 ---
 
-## 8. Detection message schema
+## 8. The vision interface
 
-**This topic does not exist yet.** `camera_hailo.py` currently renders a preview
-and publishes nothing. What follows is the schema being *requested* of Bthcorn.
-Until he implements it, the only source of detections is the stub below — treat
-every consumer as if the real publisher could differ in detail, and keep all
-parsing inside `link/detections.py`.
+**Do not invent a schema here.** This section used to specify an MQTT message
+nav was *requesting* of Bthcorn. He never implemented it, because he built
+something better shaped for his side: a library. The full field-by-field
+contract is vendored at `docs/vendor/fod-vision-v0.3.0-INTEGRATION.md`; what
+follows is only what nav depends on.
 
-`tools/fake_detections.py` publishes this schema at 30 Hz with a configurable
-scenario: a static target at a given floor position, a target that moves, an
-empty scene, and a dropout that stops publishing so the vision-timeout path can
-be exercised. It exists, and it makes the entire nav stack runnable on a laptop
-with no camera, no Pi and no robot. It deliberately shares no message-building
-code with `link/detections.py` — that module parses, this one pretends to be
-somebody else's process — so only the topic name and schema version are
-imported, and those are the two things that must not drift.
-
-`sim/scene.py` does the same job inside the simulator, without a broker, from
-objects placed in `world`.
-
-Published on MQTT topic `fod/detections`, QoS 0, retain false. Schema version 1:
-
-```json
-{
-  "schema": 1,
-  "t_capture": 1756000000.123,
-  "t_publish": 1756000000.156,
-  "frame_id": 4821,
-  "frame_size": [2304, 1296],
-  "dets": [
-    {"cls": "bolt", "conf": 0.87, "bbox": [1102, 812, 61, 44]}
-  ]
-}
+```python
+from fodcv.runtime.vision import Vision
+with Vision(hef=..., lookahead=(lo, hi)) as vision:
+    vision.latest()        # list[Target] seen this frame
+    vision.age             # seconds since the last completed frame; never raises
+    vision.detail()        # one JSON-ready dict of everything; never raises
 ```
 
-`bbox` is `[x, y, w, h]` in original-frame pixels, top-left origin. `t_capture`
-is the sensor timestamp, not the publish time — nav needs it to age the estimate
-against odometry.
+`Target(id, state, action, cls, conf, box, centroid)`:
 
-Nav-side rules:
+| field | what nav does with it |
+|---|---|
+| `id` | **his** track id, stable and never reused. Nav keeps it, so a log here can be read against a log there. |
+| `state` | `CONFIRM` / `CAUTION` / `IGNORE`. Nav chases `CONFIRM` only. |
+| `action` | `PICK` / `REPORT` / `IGNORE`. Nav chases `PICK`. Constant `PICK` today. |
+| `cls` | **Never branch on it.** It flips between frames on one object, and the four names vanish when the single-class arena dataset lands. |
+| `box` | `(x0, y0, x1, y1)` px, top-left origin. Nav's ground point is `((x0+x1)/2, y1)` -- the **bottom edge**. |
+| `centroid` | box centre. **Not** the ground point; projecting it over-ranges by an amount that grows with object height and range. |
 
-- **Treat `nail`, `screw` and `bolt` as one target class.** The CV repo's own
-  results record that screws are reliably found and reliably mislabelled as
-  `bolt`, and PRD FR-3 specifies a single `metal_fastener` class anyway.
-  Localisation is solved; naming is not. Do not build nav logic that depends on
-  which of the three came back.
-- **Ignore `unknown`.** It is 53% of the training data, a grab-bag of four
-  shapes, and the class that fires on furniture. The CV repo suppresses it by
-  default; nav must not resurrect it.
-- Assert `frame_size` matches the calibrated resolution. If it does not, the
-  homography is invalid and every projection is silently wrong.
-- An empty `dets` list is a valid message and is **not** the same as no message.
-  No message for `vision_timeout_ms` means vision is dead → stop.
+His headline read is `zone_blocked()` -- a tripwire across a horizontal band of
+the *image*, ignoring x entirely -- which is the right product for a robot that
+cannot steer. **Nav chases, so nav reads `latest()` and projects.** He is
+explicit that projection is not his:
 
-Association across frames: nearest-neighbour in `base` with a gate of
-`assoc_max_jump_m`, plus confidence hysteresis. The CV repo has a tracker with
-hysteresis whose approach is worth reading before writing this one.
+> "No metres, no floor coordinates. Boxes are pixels. Projecting to the ground
+> needs a mount height and tilt the package cannot know."
+> "No steering and no pick point."
+
+That is the boundary §1 already drew, so the division of labour is agreed rather
+than negotiated.
+
+**He already tracks and already applies hysteresis** -- 80 px association, EMA
+confidence, `CONFIRM` at 0.5 latched until 0.25. Nav does none of that; adding
+it back would put two hysteresis loops in series, each lagging the other. What
+`target.py` keeps is projection, staleness, and ageing his measurement forward
+on odometry between his 30 Hz and our 50 Hz.
+
+**Failure semantics are his, and they are deliberate.** A dead camera *raises*
+on the next read rather than returning an empty list, because "no debris, keep
+patrolling" is the one thing a broken camera must never look like. `age` never
+raises, it only grows. `link/vision.py` turns a raised failure into a frame
+carrying `error`, so the FSM stops with a reason instead of waiting out the
+vision timeout in silence -- and the timeout still catches the case where reads
+stop altogether.
+
+**One process owns the accelerator.** Never construct two `Vision` objects, and
+stop `fodcv-hailo-camera` before starting the robot. A `Vision` is single-use:
+once it has failed or exited, build a new one.
+
+`tools/fake_vision_log.py` writes his `detail()` shape to a JSONL file with no
+camera involved, and `fodnav-replay` reads it. It is a stand-in written from his
+spec, not his code -- **the first real check is replaying thirty seconds of
+output from his board**, which nobody has done.
 
 ---
 
@@ -559,6 +588,19 @@ Each of these costs a session. Add to this list when you find a new one.
   simulation has no relationship to the run, so a vision-timeout test passes for
   the wrong reason and the dropout path is never actually exercised. It is also
   the right thing on hardware: it is the loop that has to notice.
+- **Do not re-implement the vision library's tracking.** It already associates
+  on an 80 px radius and applies confidence hysteresis (CONFIRM at 0.5, latched
+  until 0.25), and it hands back stable ids. `target.py` used to do all three
+  because the schema nav was written against carried none of it. Two hysteresis
+  loops in series each lag the other and the robot gets slower to commit, not
+  steadier.
+- **`Target.centroid` is not the ground point.** It is the box centre; the
+  ground point is `((x0+x1)/2, y1)` from `box`. Same trap as §3, different
+  field name, and this one is easy to reach for because it is right there.
+- **A bounded queue is right for a live source and wrong for a replayed one.**
+  The vision source drops the oldest frames when the loop stalls, because acting
+  on a stale box is worse than not acting. Replay inherited that bound and
+  silently discarded 57% of a recorded log before anyone noticed the frame count.
 - **Three decimal places on the wire cannot express a 1e-6 tolerance.** A
   32.5 mm wheel radius in metres encodes as `0.032`, so the `I` handshake could
   never pass. The two lengths travel as millimetres for exactly this reason; see

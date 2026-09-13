@@ -7,7 +7,8 @@ import pytest
 from fodnav.config import load_nav_config, load_robot_config
 from fodnav.frames import Pose2D
 from fodnav.fsm import Mode, NavFsm, NavInputs, State
-from fodnav.ground import GroundPoint, GroundProjector
+from fodnav.ground import GroundProjector
+from fodnav.link.vision import CAUTION, CONFIRM, PICK, parse_detail
 from fodnav.link.esp32 import Flags, Telemetry
 from fodnav.sim.camera import SimCamera
 
@@ -169,14 +170,49 @@ def test_scan_mode_turns_on_the_spot_instead(robot, projector):
     assert cmd.v == 0.0 and cmd.omega != 0.0
 
 
-def test_target_mode_servos_once_a_track_is_confirmed(robot, projector):
-    nav = nav_cfg(mission__mode="target")
-    fsm = NavFsm(robot, nav, projector=projector)
-    for i in range(6):
-        fsm.tracker.update([(GroundPoint(1.0, 0.1), 0.9, "bolt")], i / 30.0, Pose2D())
-    cmd = fsm.update(alive(now=0.3))
+def vision_frame(robot, projector, targets, state=CONFIRM):
+    """A detail() frame putting his targets at the given floor positions."""
+    tracks = []
+    for i, (x, y) in enumerate(targets):
+        u, v = projector.pixel_from_floor(x, y)
+        tracks.append({
+            "id": 901 + i, "state": state, "action": PICK, "cls": "bolt",
+            "conf": 0.9, "raw": 0.9, "hits": 5, "misses": 0,
+            "box": [int(u) - 8, int(v) - 10, int(u) + 8, int(v)],
+            "centroid": [u, v - 5], "in_zone": True,
+        })
+    return parse_detail({
+        "frame_id": 1, "age": 0.0, "blocked": bool(tracks),
+        "camera": {"frame_size": list(projector.frame_size)},
+        "tracks": tracks, "error": None,
+    })
+
+
+def test_target_mode_servos_once_his_tracker_confirms(robot, projector):
+    fsm = NavFsm(robot, nav_cfg(mission__mode="target"), projector=projector)
+    cmd = fsm.update(alive(now=0.3, frames=[vision_frame(robot, projector, [(1.0, 0.1)])]))
     assert fsm.state is State.SERVO
     assert cmd.v > 0 and cmd.omega > 0
+
+
+def test_a_caution_track_is_not_chased(robot, projector):
+    # Only CONFIRM drives the robot. CAUTION means "slow down" on his design,
+    # not "go and get it", and nav must not promote it.
+    fsm = NavFsm(robot, nav_cfg(mission__mode="target"), projector=projector)
+    cmd = fsm.update(alive(frames=[vision_frame(robot, projector, [(1.0, 0.1)], state=CAUTION)]))
+    assert fsm.state is State.SEARCH and cmd.is_stop
+
+
+def test_a_reported_vision_failure_stops_the_robot(robot, projector):
+    # His reads raise when the capture thread dies; the source turns that into a
+    # frame carrying the reason. "No debris, keep patrolling" must never be what
+    # a broken camera looks like.
+    fsm = NavFsm(robot, nav_cfg(mission__mode="target"), projector=projector)
+    bad = parse_detail({"frame_id": 1, "age": 0.0, "blocked": False,
+                        "camera": {"frame_size": list(projector.frame_size)},
+                        "tracks": [], "error": "RuntimeError('hailo device gone')"})
+    cmd = fsm.update(alive(frames=[bad]))
+    assert cmd.is_stop and "vision failed" in cmd.reason
 
 
 def test_after_collecting_one_it_goes_back_to_watching(robot, projector):
@@ -210,35 +246,34 @@ def test_the_magnet_can_be_switched_off_entirely(robot, projector):
 # -- perception ingestion -------------------------------------------------
 
 
-def test_unknown_class_detections_never_become_tracks(robot, projector):
-    from fodnav.link.detections import parse_message
-    import json
-
+def test_a_class_rename_does_not_change_behaviour(robot, projector):
+    # His four class names disappear when the single-class arena dataset lands.
+    # Nav branches on state and action, so that is a no-op here.
     fsm = NavFsm(robot, nav_cfg(mission__mode="target"), projector=projector)
-    msg = {
-        "schema": 1, "t_capture": 1.0, "t_publish": 1.0, "frame_id": 1,
-        "frame_size": [2304, 1296],
-        "dets": [{"cls": "unknown", "conf": 0.99, "bbox": [1100, 900, 60, 40]}],
-    }
-    for i in range(10):
-        fsm.update(alive(now=i / 30.0, frames=[parse_message(json.dumps(msg))]))
-    assert fsm.tracker.tracks == []
-    assert fsm.state is State.SEARCH
+    frame = vision_frame(robot, projector, [(1.0, 0.0)])
+    renamed = parse_detail({
+        "frame_id": 2, "age": 0.0, "blocked": True,
+        "camera": {"frame_size": list(projector.frame_size)},
+        "tracks": [{"id": 901, "state": CONFIRM, "action": PICK, "cls": "metal_fastener",
+                    "conf": 0.9, "raw": 0.9, "hits": 5, "misses": 0,
+                    "box": list(frame.targets[0].box),
+                    "centroid": list(frame.targets[0].centroid), "in_zone": True}],
+        "error": None,
+    })
+    fsm.update(alive(frames=[renamed]))
+    assert fsm.state is State.SERVO
 
 
 def test_a_frame_size_mismatch_is_allowed_to_stop_the_run(robot, projector):
     # If the resolution does not match the calibration, every projection is
     # silently wrong. Raising into the control loop stops the robot, which is
-    # the correct outcome -- far better than driving on bad numbers.
+    # the correct outcome -- far better than driving on bad numbers. His
+    # detail() carries frame_size on every frame precisely so this is checkable.
     from fodnav.ground import GroundCalibrationError
-    from fodnav.link.detections import parse_message
-    import json
 
     fsm = NavFsm(robot, nav_cfg(mission__mode="target"), projector=projector)
-    msg = {
-        "schema": 1, "t_capture": 1.0, "t_publish": 1.0, "frame_id": 1,
-        "frame_size": [640, 480],
-        "dets": [{"cls": "bolt", "conf": 0.9, "bbox": [300, 400, 20, 20]}],
-    }
+    wrong = parse_detail({"frame_id": 1, "age": 0.0, "blocked": False,
+                          "camera": {"frame_size": [640, 480]},
+                          "tracks": [], "error": None})
     with pytest.raises(GroundCalibrationError):
-        fsm.update(alive(frames=[parse_message(json.dumps(msg))]))
+        fsm.update(alive(frames=[wrong]))

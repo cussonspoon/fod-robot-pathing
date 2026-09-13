@@ -18,6 +18,7 @@ Python package: `fodnav`. Console scripts: `fodnav-*`.
 | Pi ↔ ESP32 serial contract | [`docs/protocol.md`](docs/protocol.md) |
 | Every number Teemy measures, and how | [`docs/HARDWARE.md`](docs/HARDWARE.md) |
 | What landed, when, and why | [`docs/CHANGELOG.md`](docs/CHANGELOG.md) |
+| The vision library's own contract (vendored) | [`docs/vendor/`](docs/vendor/) |
 | What the simulator says, with caveats | [`docs/SIM_FINDINGS.md`](docs/SIM_FINDINGS.md) |
 
 Read `docs/protocol.md` before touching `src/fodnav/link/`.
@@ -49,17 +50,24 @@ quoting either number.
 ## Three processes, two repos, one robot
 
 ```
-  camera_hailo.py                fodnav-run                   ESP32
-  (system py3.11)                (venv py3.12)                (firmware)
-        |                             |                            |
-        |  MQTT fod/detections        |   UART, docs/protocol.md   |
-        |  JSON, ~30 Hz          -->  |  V/S/E/D cmds @50 Hz  -->  |
-        |                             |  <-- T telemetry @50 Hz    |
+  fodnav-run                       (Pi 5, system python3.11 venv)
+  |
+  |-- fod-vision  (Bthcorn's)      capture thread @30 FPS -> Hailo-8 -> tracker
+  |        ^  vision.detail()      pixels, stable ids, CONFIRM / CAUTION
+  |
+  |-- ground.py                    pixels -> metres in base   [ours; he will not]
+  |-- fsm + control @50 Hz
+           |  UART, docs/protocol.md
+           v
+        ESP32                      wheel PID, PWM, watchdog   (Teemy's)
 ```
 
-Vision and navigation are **separate OS processes and cannot be merged**: the
-camera stack is an apt package built against the Pi's system Python 3.11, and
-this venv is 3.12. Do not add `picamera2` or `hailo_platform` here.
+The vision side is a **library, not a service** — you import it and it runs a
+thread in your process. It must load apt's `picamera2` and `hailo_platform`,
+built against the Pi's system Python 3.11, so nav runs on 3.11 in a venv created
+with `--system-site-packages`. Do not add `picamera2`, `hailo_platform` or
+`fod-vision` to this repo's dependencies: `link/vision.py` imports the library
+lazily so everything here stays runnable on a laptop.
 
 ## Setup
 
@@ -67,8 +75,9 @@ this venv is 3.12. Do not add `picamera2` or `hailo_platform` here.
 uv sync
 ```
 
-Python 3.12. Runtime dependencies are `numpy`, `pyserial`, `paho-mqtt`,
-`pyyaml`, `opencv-python-headless` — and that list is a budget, not a starting
+Python **3.11** on the Pi (the vision library needs apt's 3.11 camera stack;
+create the venv with `--system-site-packages`). Runtime dependencies are
+`numpy`, `pyserial`, `pyyaml`, `opencv-python-headless` — and that list is a budget, not a starting
 point. Two CPU cores and a Raspberry Pi. Ask before adding to it.
 
 ## Running with no hardware
@@ -96,15 +105,16 @@ Those run the real control loop, the real FSM, the real protocol codec and the
 real projection maths. Only three things are simulated, because only three have
 no laptop equivalent: the clock, the serial transport, and the camera.
 
-To publish the §8 detection schema on a real broker instead — for testing
-against another process, or for recording a log:
+To make a recorded-looking vision log without a camera — in exactly the format
+the real library produces, and the real robot records:
 
 ```bash
-uv run python tools/fake_detections.py --scenario static --x 0.8 --y 0.1
+uv run python tools/fake_vision_log.py --scenario approach -o logs/fake.jsonl
 ```
 
-It also takes `--scenario moving|empty|dropout`, `--clutter` to add `unknown`
-boxes that nav must ignore, and `--jsonl PATH` to record a replayable log.
+It also takes `--scenario static|empty|dropout`, where `dropout` emits the
+error frame a dead camera produces — because "no debris, keep patrolling" is
+the one thing a broken camera must never look like.
 
 Feed a recorded detection log back through the perception stack:
 

@@ -2,7 +2,8 @@
 
 Its whole job is to make the vision-driven half of the stack runnable on a
 laptop: it turns floor positions in ``base`` into bounding boxes in pixels, so
-``tools/fake_detections.py`` can say "put a bolt at (0.8, 0.15)" and publish
+``sim/scene.py`` and ``tools/fake_vision_log.py`` can say "put a bolt at
+(0.8, 0.15)" and emit
 something shaped like what Bthcorn's publisher will eventually send.
 
 The optics are invented -- a wide-angle module at the mount geometry in
@@ -41,11 +42,15 @@ from ..ground import (
 
 __all__ = ["SimCamera", "DEFAULT_HFOV_DEG"]
 
-#: Horizontal field of view of the fictional lens, degrees. A wide module, of
-#: the sort you would actually point at the floor 22 cm in front of a robot.
-#: If the real camera turns out to be narrower, the real ``fov_near_limit_m``
-#: measurement will say so and the fiction is irrelevant.
-DEFAULT_HFOV_DEG = 102.0
+#: Horizontal field of view, degrees. **No longer a guess**: Camera Module 3's
+#: standard lens is 66 degrees (the wide variant is 102), and the vision package
+#: ships configured for it -- see docs/vendor/.
+#:
+#: This was 102 while the camera was imaginary, and dropping it to the real
+#: figure roughly doubles the terminal blind leg at a given mount: a narrower
+#: lens sees less floor close in. That makes the mount geometry (PRD O-3) matter
+#: far more than the fiction suggested, which is a result, not an inconvenience.
+DEFAULT_HFOV_DEG = 66.0
 
 
 @dataclass

@@ -19,7 +19,7 @@ import sys
 from ..config import ConfigError
 from ..fsm import NavFsm
 from ..ground import projector_from_config
-from ..link.detections import JsonlDetectionLog, MqttDetectionSource
+from ..link.vision import JsonlVisionLog, LibraryVisionSource
 from ..link.esp32 import Esp32Link, HandshakeError, SerialTransport
 from ..odom import Odometry
 from ..runner import ControlLoop, RealClock
@@ -101,14 +101,19 @@ def main(argv: list[str] | None = None) -> int:
 
     det_log = None
     if log is not None:
-        det_log = JsonlDetectionLog(log.dir / "detections.jsonl")
-    detections = MqttDetectionSource(
-        host=nav.get("detections.broker_host"),
-        port=nav.get("detections.broker_port"),
-        topic=nav.get("detections.topic"),
+        det_log = JsonlVisionLog(log.dir / "detections.jsonl")
+    # His library, in this process. One Vision object per process, ever.
+    detections = LibraryVisionSource(
+        hef=nav.get("detections.hef"),
+        lookahead=(nav.get("detections.lookahead_lo"), nav.get("detections.lookahead_hi")),
+        conf=nav.get("detections.conf"),
         log=det_log,
     )
-    detections.start()
+    try:
+        detections.start()
+    except Exception as e:
+        link.shutdown()
+        die(f"vision failed to start: {type(e).__name__}: {e}")
 
     odom = Odometry.from_config(robot)
     fsm = NavFsm(robot, nav, projector=projector)

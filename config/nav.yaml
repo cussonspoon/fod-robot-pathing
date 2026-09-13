@@ -71,20 +71,21 @@ servo:                      # visual servo, for driving to a detected object
   lost_timeout_s: 1.0
 
 detections:
-  topic: fod/detections     # CLAUDE.md §8. Does not exist yet -- tools/fake_detections.py
-                            # is the only publisher until Bthcorn implements it.
-  broker_host: 127.0.0.1
-  broker_port: 1883
-  acquire_conf: 0.50        # hysteresis pair: acquire high...
-  drop_conf: 0.30           # ...drop low, so a flickering box does not thrash the FSM
-  target_classes: [nail, screw, bolt]   # ONE target class. The CV repo reliably finds
-                            # screws and reliably calls them bolts; PRD FR-3 wants a
-                            # single metal_fastener anyway. Never branch on which.
-  ignore_classes: [unknown] # 53% of the training data, four shapes in a trench coat,
-                            # and the class that fires on furniture.
-  assoc_max_jump_m: 0.20
-  min_hits: 3
-  max_misses: 5
+  # The vision side is a LIBRARY, not a topic. See docs/vendor/. His tracker
+  # already does association (80 px match radius) and confidence hysteresis
+  # (CONFIRM at 0.5, latched until 0.25), and hands back stable track ids, so
+  # none of that is configured here any more. What is left is what we pass to
+  # his constructor, plus one backstop of our own.
+  hef: artifacts/arg-bolts-4-n-640/bench_int8_hailo_model_conf00001/best.hef
+  conf: 0.25              # his host-side score filter, applied before tracking
+  lookahead_lo: 0.5       # his zone_blocked strip, as a fraction of frame height.
+  lookahead_hi: 1.0       # PLACEHOLDER -- it cannot be a real number until the
+                          # camera mount height and tilt are measured (PRD O-3),
+                          # which is the same measurement our ground calibration
+                          # is waiting on. Nav chases, so nav reads latest() and
+                          # does its own projection; the strip is carried for the
+                          # run log and for a speed-governed mode.
+  max_age_s: 0.5          # drop a projected track this long after its last sighting
 
 planner:
   swath_source: drum        # drum | drum_capture | camera

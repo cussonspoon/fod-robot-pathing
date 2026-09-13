@@ -20,7 +20,7 @@ from fodnav.ground import (
     load_ground_calibration,
     mount_from_config,
 )
-from fodnav.link.detections import Detection
+from fodnav.link.vision import CONFIRM, PICK, Target
 from fodnav.sim.camera import SimCamera
 
 SIM_YAML = "config/sim_robot.yaml"
@@ -120,22 +120,28 @@ def test_the_optical_axis_lands_where_trigonometry_says(robot, projector):
 # -- the three refusals ---------------------------------------------------
 
 
-def test_the_horizon_is_rejected_rather_than_extrapolated(cam, projector):
-    # A ray that does not point downward has no floor intersection. Returning a
+def test_the_mount_keeps_the_horizon_out_of_frame(cam):
+    # At 25 deg down-tilt with a 66 deg lens the top of the image is still floor,
+    # so the horizon never appears. That is a property of the mount, not of the
+    # guard -- and it is one reason to tilt this steeply.
+    assert cam.horizon_row() is None
+
+
+def test_a_ray_that_never_reaches_the_floor_is_rejected(projector):
+    # The guard itself, driven with pixels above where the floor can be. A ray
+    # that does not point downward has no floor intersection, and returning a
     # huge or negative range instead of nothing is how a robot decides to drive
-    # to a light fitting.
-    row = cam.horizon_row()
-    assert row is not None, "the fictional camera should see its own horizon"
-    assert projector.project_pixel(cam.width_px / 2.0, row) is None
-    assert projector.project_pixel(cam.width_px / 2.0, row - 5.0) is None
-    assert projector.project_pixel(cam.width_px / 2.0, 0.0) is None
-    assert projector.stats()["rejected_horizon"] >= 3
+    # at a light fitting.
+    before = projector.stats()["rejected_horizon"]
+    for v in (-4000.0, -1200.0, -400.0):
+        assert projector.project_pixel(projector.frame_size[0] / 2.0, v) is None
+    assert projector.stats()["rejected_horizon"] >= before + 3
 
 
-def test_just_below_the_horizon_still_projects(cam, projector):
-    g = projector.project_pixel(cam.width_px / 2.0, cam.horizon_row() + 40.0)
-    # It is a real floor point, just a distant one -- possibly beyond the range
-    # gate, which is the *other* refusal.
+def test_the_top_of_the_frame_is_still_floor_with_this_mount(cam, projector):
+    g = projector.project_pixel(cam.width_px / 2.0, 2.0)
+    # A real floor point, just a distant one -- possibly beyond the range gate,
+    # which is the *other* refusal.
     assert g is None or g.x > 1.0
 
 
@@ -150,7 +156,8 @@ def test_beyond_the_calibrated_patch_is_rejected(projector, robot):
 def test_a_frame_size_mismatch_is_an_error_not_a_warning(projector):
     # If the resolution does not match, the homography is invalid and every
     # projection is silently wrong (CLAUDE.md §8).
-    det = Detection(cls="bolt", conf=0.9, x=1100.0, y=800.0, w=60.0, h=40.0)
+    det = Target(id=901, state=CONFIRM, action=PICK, cls="bolt", conf=0.9,
+                 box=(1100, 800, 1160, 840), centroid=(1130.0, 820.0))
     projector.project_detection(det, frame_size=projector.frame_size)  # fine
     with pytest.raises(GroundCalibrationError, match="frame_size|silently wrong"):
         projector.project_detection(det, frame_size=(640, 480))
@@ -164,12 +171,14 @@ def test_the_letterboxed_network_input_is_caught_by_that_check(projector):
 # -- bottom-centre, and why ----------------------------------------------
 
 
-def _det_for(cam, obj):
-    from fodnav.link.detections import Detection as D
-
+def _target_for(cam, obj):
+    """One of his Targets for a simulated object, through the real optics."""
     bbox = cam.bbox_for(obj)
     assert bbox is not None, f"object at x={obj.x} is not in frame"
-    return D(cls="bolt", conf=0.9, x=bbox[0], y=bbox[1], w=bbox[2], h=bbox[3])
+    x, y, w, h = bbox
+    box = (int(x), int(y), int(x + w), int(y + h))
+    return Target(id=901, state=CONFIRM, action=PICK, cls="bolt", conf=0.9, box=box,
+                  centroid=(0.5 * (box[0] + box[2]), 0.5 * (box[1] + box[3])))
 
 
 def test_the_bottom_edge_lands_on_the_near_edge_of_the_object_at_any_range(cam, projector):
@@ -181,7 +190,7 @@ def test_the_bottom_edge_lands_on_the_near_edge_of_the_object_at_any_range(cam, 
 
     for x in (0.4, 0.7, 1.1, 1.5):
         obj = SimObject(x=x, y=0.1, length_m=0.06)
-        g = projector.project_pixel(*_det_for(cam, obj).ground_px)
+        g = projector.project_pixel(*_target_for(cam, obj).ground_px)
         assert g.x == pytest.approx(x - obj.length_m / 2.0, abs=2e-3)
         assert g.y == pytest.approx(0.1, abs=1e-2)
 
@@ -189,8 +198,8 @@ def test_the_bottom_edge_lands_on_the_near_edge_of_the_object_at_any_range(cam, 
 def test_the_bottom_edge_does_not_care_how_tall_the_object_is(cam, projector):
     from fodnav.sim.camera import SimObject
 
-    flat = projector.project_pixel(*_det_for(cam, SimObject(x=0.7, height_m=0.005)).ground_px)
-    tall = projector.project_pixel(*_det_for(cam, SimObject(x=0.7, height_m=0.050)).ground_px)
+    flat = projector.project_pixel(*_target_for(cam, SimObject(x=0.7, height_m=0.005)).ground_px)
+    tall = projector.project_pixel(*_target_for(cam, SimObject(x=0.7, height_m=0.050)).ground_px)
     assert tall.x == pytest.approx(flat.x, abs=2e-3)
 
 
@@ -203,16 +212,16 @@ def test_the_centroid_over_ranges_and_gets_worse_with_height_and_distance(cam, p
 
     errors = []
     for x in (0.4, 0.7, 1.1):
-        det = _det_for(cam, SimObject(x=x, height_m=0.05))
-        centre = projector.project_pixel(*det.centre_px)
+        det = _target_for(cam, SimObject(x=x, height_m=0.05))
+        centre = projector.project_pixel(*det.centroid)
         bottom = projector.project_pixel(*det.ground_px)
         errors.append(centre.x - x)
         assert centre.x > bottom.x
     assert errors == sorted(errors), "the centroid's range error must grow with distance"
     assert errors[-1] > 0.10, "and it gets large: over 10 cm at ~1 m on a 5 cm object"
 
-    flat = projector.project_pixel(*_det_for(cam, SimObject(x=0.7, height_m=0.005)).centre_px)
-    tall = projector.project_pixel(*_det_for(cam, SimObject(x=0.7, height_m=0.050)).centre_px)
+    flat = projector.project_pixel(*_target_for(cam, SimObject(x=0.7, height_m=0.005)).centroid)
+    tall = projector.project_pixel(*_target_for(cam, SimObject(x=0.7, height_m=0.050)).centroid)
     assert tall.x > flat.x + 0.05, "and with object height"
 
 
@@ -237,7 +246,7 @@ def test_loading_asserts_the_calibration_matches_the_robot(tmp_path, cam, robot)
 
 @pytest.mark.parametrize(
     "field, value",
-    [("height_m", 0.30), ("tilt_deg", 25.0), ("offset_x_m", 0.2), ("roll_deg", 2.0)],
+    [("height_m", 0.30), ("tilt_deg", 12.0), ("offset_x_m", 0.2), ("roll_deg", 2.0)],
 )
 def test_a_moved_mount_voids_the_calibration(tmp_path, cam, robot, field, value):
     # Any change to the mount invalidates it. Silently using the old one gives

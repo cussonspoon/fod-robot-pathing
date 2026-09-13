@@ -30,16 +30,21 @@ def test_the_declared_field_of_view_matches_the_camera_it_publishes_through(cam,
     )
 
 
-def test_the_detection_swath_is_much_wider_than_the_drum(cam, robot):
-    # Not an accident, and not a bug: CLAUDE.md §9 says the right swath width
-    # depends on whether coverage means detection or collection, and these two
-    # numbers are how far apart the two answers are.
-    assert cam.width_at(0.30) > 2.0 * robot.get("drum.width_m")
+def test_the_detection_swath_is_wider_than_the_drum_but_not_by_much(cam, robot):
+    # CLAUDE.md §9 says the right swath depends on whether coverage means
+    # detection or collection. With the fictional 102 deg lens the two answers
+    # differed by ~3x. With the real 66 deg lens of Camera Module 3 the gap
+    # narrows to about 1.8x -- still a real difference, but a much smaller one,
+    # and the narrower lens is why.
+    ratio = cam.width_at(0.30) / robot.get("drum.width_m")
+    assert 1.5 < ratio < 2.2
 
 
-def test_the_horizon_is_in_frame_so_the_guard_has_work_to_do(cam):
-    row = cam.horizon_row()
-    assert row is not None and 0 < row < cam.height_px
+def test_this_mount_keeps_the_horizon_out_of_frame(cam):
+    # 25 deg of down-tilt against a 40 deg vertical field puts the top of the
+    # image 5 deg below horizontal, so every pixel is floor. Tilting this
+    # steeply is what buys back the near limit the narrow lens costs.
+    assert cam.horizon_row() is None
 
 
 def test_the_bottom_of_the_box_is_the_objects_nearest_contact_with_the_floor(cam):
