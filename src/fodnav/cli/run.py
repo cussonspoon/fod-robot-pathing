@@ -23,15 +23,18 @@ from ..link.vision import JsonlVisionLog, LibraryVisionSource
 from ..link.esp32 import Esp32Link, HandshakeError, SerialTransport
 from ..odom import Odometry
 from ..runner import ControlLoop, RealClock
-from ._common import add_config_args, add_log_args, die, install_safe_stop, load_configs, make_run_log
+from ._common import (
+    add_config_args, add_log_args, config_file, die, install_safe_stop, load_configs, make_run_log,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="fodnav-run", description=__doc__)
     add_config_args(p)
     add_log_args(p)
-    p.add_argument("--ground-calib", default="config/ground_homography.json",
-                   help="the floor projection, from fodnav-calib-ground")
+    p.add_argument("--ground-calib", default=None,
+                   help="the floor projection, from fodnav-calib-ground "
+                        "(default: ground_homography.json in the config directory)")
     p.add_argument("--port", default=None, help="override link.port from robot.yaml")
     p.add_argument("--duration", type=float, default=None, help="stop after this many seconds")
     p.add_argument("--dry-run", action="store_true",
@@ -49,6 +52,7 @@ def main(argv: list[str] | None = None) -> int:
         robot, nav = load_configs(args)
     except ConfigError as e:
         die(str(e))
+    args.ground_calib = config_file(args, args.ground_calib or "ground_homography.json")
 
     log = make_run_log(args, "run", robot, nav)
     try:

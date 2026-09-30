@@ -213,3 +213,35 @@ def test_loop_period_comes_from_the_rate():
     assert nav.get("loop.vision_timeout_s") == pytest.approx(
         nav.get("loop.vision_timeout_ms") / 1000.0
     )
+
+
+# -- finding the files -------------------------------------------------------
+
+
+def test_a_config_argument_that_exists_is_used_as_given(tmp_path):
+    from fodnav.config import config_path
+
+    f = tmp_path / "mine.yaml"
+    f.write_text("")
+    assert config_path(f, tmp_path / "elsewhere") == f
+
+
+def test_a_missing_relative_path_is_looked_up_by_name_in_the_config_dir(tmp_path, monkeypatch):
+    # An installed fodnav-sim started from ~ has no ./config. Its default
+    # "config/sim_robot.yaml" must still find the packaged sim_robot.yaml.
+    from fodnav.config import config_path
+
+    monkeypatch.chdir(tmp_path)
+    cfg = tmp_path / "cfg"
+    assert config_path("config/sim_robot.yaml", cfg) == cfg / "sim_robot.yaml"
+    assert config_path("sim_robot.yaml", cfg) == cfg / "sim_robot.yaml"
+
+
+def test_the_shipped_config_dir_is_the_repo_one_in_a_checkout(tmp_path, monkeypatch):
+    from fodnav.config import find_config_dir
+
+    monkeypatch.chdir(tmp_path)                     # no ./config here
+    monkeypatch.delenv("FODNAV_CONFIG_DIR", raising=False)
+    d = find_config_dir()
+    assert (d / "nav.yaml").is_file() and (d / "sim_robot.yaml").is_file()
+

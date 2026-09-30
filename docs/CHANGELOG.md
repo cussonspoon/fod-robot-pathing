@@ -37,6 +37,26 @@ times.
   returning the last frame, with `age` growing. `SimHarness(library_vision=True)`
   drives the Pi's `LibraryVisionSource` through it.
 
+### Packaging: nav is now a released wheel
+
+Published on GitHub Releases as `fod_robot_pathing-0.2.1-py3-none-any.whl`, so
+the integration harness can install a version instead of cloning the repo.
+Three things had to change for an installed copy to work at all (harness
+findings #3 and #4):
+
+- **`config/` ships inside the wheel** as `fodnav/_config`, and
+  `find_config_dir()` falls back to it last. Config-file arguments that do not
+  exist relative to the working directory are looked up by name in the config
+  directory, so `fodnav-sim` works from `~`. `fodnav-run --ground-calib`
+  defaults to `ground_homography.json` in the config directory, not
+  `./config/`.
+- **Dependency floors are the Pi's apt versions**: `numpy>=1.24`,
+  `opencv-python-headless>=4.6`. The full suite passes against the installed
+  wheel on numpy 1.24.4 and opencv-headless 4.6.0.66.
+- **`.python-version` is 3.11**, matching `requires-python` and the Pi.
+
+The package version was still `0.1.0` through 0.2.0; it now reads `0.2.1`.
+
 ### Why the existing test missed it
 
 `test_vision_dying_mid_approach_stops_the_robot_short` passed because the sim

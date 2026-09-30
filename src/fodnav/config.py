@@ -747,12 +747,19 @@ def _load(path: Path, schema: Mapping[str, Field], derived: Mapping[str, Derived
     return Config(values, schema, derived, source, name)
 
 
+#: The copy of ``config/`` shipped inside the wheel (see pyproject.toml). It
+#: holds the same files as the repo: ``robot.yaml`` is the all-null template, so
+#: a real run still refuses to start until someone supplies measured values.
+PACKAGED_CONFIG_DIR = Path(__file__).resolve().parent / "_config"
+
+
 def find_config_dir(explicit: str | os.PathLike | None = None) -> Path:
     """Locate the ``config/`` directory.
 
     Order: an explicit argument, then ``$FODNAV_CONFIG_DIR``, then ``./config``,
-    then the repo root above this file. Nothing here searches the whole system:
-    a config found by accident is worse than one not found at all.
+    then the repo checkout this file sits in, then the copy shipped in the
+    installed package. Nothing here searches the whole system: a config found by
+    accident is worse than one not found at all.
     """
     if explicit is not None:
         p = Path(explicit).expanduser()
@@ -768,13 +775,29 @@ def find_config_dir(explicit: str | os.PathLike | None = None) -> Path:
     cwd = Path.cwd() / "config"
     if cwd.is_dir():
         return cwd
-    repo = Path(__file__).resolve().parents[2] / "config"
-    if repo.is_dir():
-        return repo
+    root = Path(__file__).resolve().parents[2]
+    if (root / "config").is_dir() and (root / "pyproject.toml").is_file():
+        return root / "config"
+    if PACKAGED_CONFIG_DIR.is_dir():
+        return PACKAGED_CONFIG_DIR
     raise ConfigError(
         "cannot find a config/ directory. Run from the repo root, pass an "
         "explicit path, or set $FODNAV_CONFIG_DIR."
     )
+
+
+def config_path(path: str | os.PathLike, config_dir: Path) -> Path:
+    """A config-file argument, resolved.
+
+    As given if it exists (so ``config/sim_robot.yaml`` from the repo root means
+    what it says), otherwise the file of that *name* in ``config_dir``. That is
+    what lets an installed ``fodnav-sim`` started from any directory find
+    ``sim_robot.yaml`` without anyone typing a site-packages path.
+    """
+    p = Path(path).expanduser()
+    if p.is_absolute() or p.exists():
+        return p
+    return config_dir / p.name
 
 
 def load_robot_config(path: str | os.PathLike | None = None) -> Config:

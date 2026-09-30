@@ -12,9 +12,10 @@ import argparse
 import atexit
 import signal
 import sys
-from pathlib import Path
 
-from ..config import Config, ConfigError, find_config_dir, load_nav_config, load_robot_config
+from ..config import (
+    Config, ConfigError, config_path, find_config_dir, load_nav_config, load_robot_config,
+)
 from ..runlog import RunLog
 
 __all__ = [
@@ -23,6 +24,7 @@ __all__ = [
     "load_configs",
     "make_run_log",
     "install_safe_stop",
+    "config_file",
     "die",
 ]
 
@@ -57,8 +59,8 @@ def add_log_args(parser: argparse.ArgumentParser) -> None:
 def load_configs(args) -> tuple[Config, Config]:
     """Load both files and apply any ``--set`` overrides to the nav one."""
     cfg_dir = find_config_dir(args.config_dir)
-    robot_path = Path(args.robot_config) if args.robot_config else cfg_dir / "robot.yaml"
-    nav_path = Path(args.nav_config) if args.nav_config else cfg_dir / "nav.yaml"
+    robot_path = config_path(args.robot_config or "robot.yaml", cfg_dir)
+    nav_path = config_path(args.nav_config or "nav.yaml", cfg_dir)
     robot = load_robot_config(robot_path)
     nav = load_nav_config(nav_path)
     for override in getattr(args, "set", []):
@@ -67,6 +69,11 @@ def load_configs(args) -> tuple[Config, Config]:
         path, _, raw = override.partition("=")
         _apply_override(nav, path.strip(), raw.strip())
     return robot, nav
+
+
+def config_file(args, name: str) -> str:
+    """Any other file that lives beside the configs (a ground calibration)."""
+    return str(config_path(name, find_config_dir(args.config_dir)))
 
 
 def _apply_override(nav: Config, path: str, raw: str) -> None:

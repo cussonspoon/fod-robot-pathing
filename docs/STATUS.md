@@ -24,8 +24,9 @@ state, not an outstanding task for nav: it is Teemy's file and nothing in it has
 been measured. Everything that needs one of those numbers fails at startup
 naming the field and its `docs/HARDWARE.md` procedure.
 
-Git: v0.1.0 and the CV integration (PR #3) are both on `main`; the real-capture
-replay is on `feat/replay-real-cv-captures`.
+Git: everything is on `main`. **v0.2.1 is published as a wheel on GitHub
+Releases** -- install it rather than cloning when you only need to run nav (see
+the README). It carries the stalled-camera safety fix.
 
 ## The vision interface changed under us (2026-09-10)
 

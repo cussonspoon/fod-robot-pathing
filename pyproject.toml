@@ -1,6 +1,6 @@
 [project]
 name = "fod-robot-pathing"
-version = "0.1.0"
+version = "0.2.1"
 description = "Navigation, path planning and motion control for the FOD robot."
 readme = "README.md"
 requires-python = ">=3.11,<3.13"
@@ -19,11 +19,15 @@ requires-python = ">=3.11,<3.13"
 # fod-vision itself is NOT declared here. It is installed into the Pi's system
 # interpreter from Bthcorn's release, it only exists on hardware, and
 # link/vision.py imports it lazily so this package stays importable on a laptop.
+#
+# The floors are the Pi's apt versions, not the newest: nav imports into the
+# same process as picamera2 and hailo_platform, which run on apt numpy 1.24 and
+# python3-opencv 4.6. The whole suite passes on exactly those.
 dependencies = [
-    "numpy>=2.0",
+    "numpy>=1.24",
     "pyserial>=3.5",
     "pyyaml>=6.0",
-    "opencv-python-headless>=4.10",
+    "opencv-python-headless>=4.6",
 ]
 
 [project.scripts]
@@ -46,6 +50,12 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/fodnav"]
+
+# Ship config/ inside the wheel, so an installed fodnav-sim works from any
+# directory. find_config_dir() uses this copy only when there is no config/
+# beside the caller; a real robot still passes its own with --config-dir.
+[tool.hatch.build.targets.wheel.force-include]
+"config" = "fodnav/_config"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
