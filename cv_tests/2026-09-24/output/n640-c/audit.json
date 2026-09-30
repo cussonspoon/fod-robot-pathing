@@ -1,0 +1,613 @@
+{
+  "capture": "cv_tests/2026-09-24/data/n640-c",
+  "hef": "/home/ai/fod-robot/artifacts/arg-bolts-4-n-640/bench_int8_hailo_model_conf00001/best.hef",
+  "imgsz": 640,
+  "host_conf": 0.25,
+  "parse": {
+    "lines": 780,
+    "bad_json": 0,
+    "frames_parsed": 780,
+    "problems": {},
+    "first_example": {},
+    "extra_top_level_keys": {
+      "t": 780,
+      "targets": 780
+    },
+    "non_finite_values": {},
+    "frame_sizes": {
+      "1280x720": 780
+    }
+  },
+  "latest_reconstruction": {
+    "frames_with_his_targets": 780,
+    "frames_without": 0,
+    "match": 780,
+    "mismatch": 0,
+    "targets_ours": 6471,
+    "targets_his": 6471
+  },
+  "stream": {
+    "duration_s": 26.2,
+    "frame_id_first_last": [
+      2,
+      788
+    ],
+    "frame_id_non_monotonic": 0,
+    "frames_skipped_in_log": 7,
+    "effective_fps": 29.7,
+    "dt_ms_median_p95": [
+      33.3,
+      38.8
+    ],
+    "infer_ms_median_p95": [
+      16.0,
+      16.7
+    ],
+    "total_ms_median_p95": [
+      33.2,
+      38.1
+    ],
+    "error_frames": 0,
+    "blocked_frames": 466
+  },
+  "tracks": {
+    "track_rows": 8079,
+    "coasting_rows": 1608,
+    "distinct_ids": 163,
+    "by_state": {
+      "CAUTION": 2318,
+      "CONFIRM": 5761
+    },
+    "by_action": {
+      "PICK": 8079
+    },
+    "state_transitions": {
+      "CAUTION->CONFIRM": 24
+    },
+    "ids_whose_cls_flips": 60,
+    "cls_flip_examples": {
+      "0": [
+        "bolt",
+        "screw"
+      ],
+      "1": [
+        "bolt",
+        "washer"
+      ],
+      "2": [
+        "bolt",
+        "screw"
+      ],
+      "5": [
+        "bolt",
+        "screw"
+      ],
+      "8": [
+        "bolt",
+        "screw"
+      ]
+    },
+    "confirmed_boxes_over_80pct_frame_width": [
+      {
+        "frame_id": 4,
+        "id": 1,
+        "conf": 0.514,
+        "box": [
+          11,
+          0,
+          1157,
+          612
+        ]
+      }
+    ],
+    "duplicates": {
+      "iou_threshold": 0.7,
+      "frames_with_a_duplicate": 245,
+      "frames_with_a_confirmed_duplicate": 76,
+      "distinct_id_pairs": 71,
+      "pairs_cls_differs": 288,
+      "pairs_cls_same": 0
+    },
+    "ground_below_centroid_px_median_max": [
+      21.0,
+      352.0
+    ]
+  },
+  "nav": {
+    "calibration": "config/sim_ground_homography.json",
+    "calibration_is_fictional": true,
+    "chased_target_rows": 5344,
+    "distinct_chased_ids": 38,
+    "projected": 5344,
+    "rejected_by_projector": 0,
+    "projector_stats": {
+      "rejected_horizon": 0,
+      "rejected_range": 0
+    },
+    "range_m_min_median_max": [
+      0.23,
+      0.423,
+      1.017
+    ],
+    "frames_with_a_best_target": 778,
+    "best_target_switches": 33,
+    "best_target_switches_between_duplicates": 17,
+    "best_target_ids": {
+      "66": 288,
+      "1": 157,
+      "0": 129,
+      "87": 72,
+      "96": 71
+    }
+  },
+  "examples": [
+    {
+      "title": "a typical frame, with as many kinds of row as possible",
+      "source": "raw_part01.jsonl:180",
+      "frame_id": 184,
+      "frame_size": [
+        1280,
+        720
+      ],
+      "blocked": false,
+      "tracks": [
+        {
+          "id": 0,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.563056221512068,
+          "misses": 0,
+          "box": [
+            717,
+            236,
+            762,
+            281
+          ],
+          "centroid": [
+            739.5,
+            258.5
+          ]
+        },
+        {
+          "id": 1,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "bolt",
+          "conf": 0.4810669463203574,
+          "misses": 0,
+          "box": [
+            486,
+            194,
+            545,
+            247
+          ],
+          "centroid": [
+            515.5,
+            220.5
+          ]
+        },
+        {
+          "id": 8,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.4930475114910741,
+          "misses": 0,
+          "box": [
+            643,
+            141,
+            687,
+            168
+          ],
+          "centroid": [
+            665.0,
+            154.5
+          ]
+        },
+        {
+          "id": 43,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.30483575418214415,
+          "misses": 0,
+          "box": [
+            673,
+            197,
+            726,
+            224
+          ],
+          "centroid": [
+            699.5,
+            210.5
+          ]
+        },
+        {
+          "id": 46,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.27743443369865417,
+          "misses": 1,
+          "box": [
+            630,
+            107,
+            662,
+            130
+          ],
+          "centroid": [
+            646.0,
+            118.5
+          ]
+        }
+      ],
+      "chased": [
+        {
+          "id": 0,
+          "conf": 0.563,
+          "cls": "screw",
+          "box": [
+            717,
+            236,
+            762,
+            281
+          ],
+          "ground_px": [
+            739.5,
+            281.0
+          ],
+          "projected": {
+            "x_m": 0.534,
+            "y_m": -0.052,
+            "range_m": 0.536,
+            "bearing_deg": -5.6
+          }
+        },
+        {
+          "id": 1,
+          "conf": 0.481,
+          "cls": "bolt",
+          "box": [
+            486,
+            194,
+            545,
+            247
+          ],
+          "ground_px": [
+            515.5,
+            247.0
+          ],
+          "projected": {
+            "x_m": 0.589,
+            "y_m": 0.071,
+            "range_m": 0.594,
+            "bearing_deg": 6.9
+          }
+        },
+        {
+          "id": 8,
+          "conf": 0.493,
+          "cls": "screw",
+          "box": [
+            643,
+            141,
+            687,
+            168
+          ],
+          "ground_px": [
+            665.0,
+            168.0
+          ],
+          "projected": {
+            "x_m": 0.773,
+            "y_m": -0.019,
+            "range_m": 0.773,
+            "bearing_deg": -1.4
+          }
+        }
+      ],
+      "held": {
+        "40": {
+          "age_s": 0.496,
+          "x_m": 0.903,
+          "y_m": -0.005,
+          "range_m": 0.903,
+          "bearing_deg": -0.3
+        }
+      },
+      "best": 0,
+      "rows": [
+        {
+          "input": {
+            "id": 0,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.563056221512068,
+            "misses": 0,
+            "box": [
+              717,
+              236,
+              762,
+              281
+            ],
+            "centroid": [
+              739.5,
+              258.5
+            ]
+          },
+          "ground_px": [
+            739.5,
+            281.0
+          ],
+          "floor": {
+            "x_m": 0.534,
+            "y_m": -0.052,
+            "range_m": 0.536,
+            "bearing_deg": -5.6
+          },
+          "verdict": "**chosen**",
+          "why": "CONFIRM + PICK, and the nearest of 4 candidate(s), so nav drives at it. Projected from the bottom-centre, 22 px below the centroid."
+        },
+        {
+          "input": {
+            "id": 1,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "bolt",
+            "conf": 0.4810669463203574,
+            "misses": 0,
+            "box": [
+              486,
+              194,
+              545,
+              247
+            ],
+            "centroid": [
+              515.5,
+              220.5
+            ]
+          },
+          "ground_px": [
+            515.5,
+            247.0
+          ],
+          "floor": {
+            "x_m": 0.589,
+            "y_m": 0.071,
+            "range_m": 0.594,
+            "bearing_deg": 6.9
+          },
+          "verdict": "candidate",
+          "why": "CONFIRM + PICK, projected from the bottom-centre. Not chosen: id 0 is nearer (0.536 m against 0.594 m). Conf 0.48 is under 0.5, but his latch holds CONFIRM until 0.25."
+        },
+        {
+          "input": {
+            "id": 8,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.4930475114910741,
+            "misses": 0,
+            "box": [
+              643,
+              141,
+              687,
+              168
+            ],
+            "centroid": [
+              665.0,
+              154.5
+            ]
+          },
+          "ground_px": [
+            665.0,
+            168.0
+          ],
+          "floor": {
+            "x_m": 0.773,
+            "y_m": -0.019,
+            "range_m": 0.773,
+            "bearing_deg": -1.4
+          },
+          "verdict": "candidate",
+          "why": "CONFIRM + PICK, projected from the bottom-centre. Not chosen: id 0 is nearer (0.536 m against 0.773 m). Conf 0.49 is under 0.5, but his latch holds CONFIRM until 0.25."
+        },
+        {
+          "input": {
+            "id": 43,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.30483575418214415,
+            "misses": 0,
+            "box": [
+              673,
+              197,
+              726,
+              224
+            ],
+            "centroid": [
+              699.5,
+              210.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.30; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        },
+        {
+          "input": {
+            "id": 46,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.27743443369865417,
+            "misses": 1,
+            "box": [
+              630,
+              107,
+              662,
+              130
+            ],
+            "centroid": [
+              646.0,
+              118.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "dropped (coasting)",
+          "why": "His tracker did not see it this frame (`misses` 1). His `latest()` leaves coasting tracks out, and so does nav."
+        },
+        {
+          "input": null,
+          "id": 40,
+          "ground_px": null,
+          "floor": {
+            "age_s": 0.496,
+            "x_m": 0.903,
+            "y_m": -0.005,
+            "range_m": 0.903,
+            "bearing_deg": -0.3
+          },
+          "verdict": "held",
+          "why": "Gone from his list, but last seen as CONFIRM 0.496 s ago, inside `detections.max_age_s`, so it is still a candidate."
+        }
+      ]
+    },
+    {
+      "title": "the whole-frame box that reaches CONFIRM",
+      "source": "raw_part01.jsonl:3",
+      "frame_id": 4,
+      "frame_size": [
+        1280,
+        720
+      ],
+      "blocked": false,
+      "tracks": [
+        {
+          "id": 0,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.39873331785202026,
+          "misses": 2,
+          "box": [
+            665,
+            439,
+            722,
+            476
+          ],
+          "centroid": [
+            693.5,
+            457.5
+          ]
+        },
+        {
+          "id": 1,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "bolt",
+          "conf": 0.5138643682003021,
+          "misses": 0,
+          "box": [
+            11,
+            0,
+            1157,
+            612
+          ],
+          "centroid": [
+            584.0,
+            306.0
+          ]
+        }
+      ],
+      "chased": [
+        {
+          "id": 1,
+          "conf": 0.514,
+          "cls": "bolt",
+          "box": [
+            11,
+            0,
+            1157,
+            612
+          ],
+          "ground_px": [
+            584.0,
+            612.0
+          ],
+          "projected": {
+            "x_m": 0.27,
+            "y_m": 0.016,
+            "range_m": 0.27,
+            "bearing_deg": 3.3
+          }
+        }
+      ],
+      "held": {},
+      "best": 1,
+      "rows": [
+        {
+          "input": {
+            "id": 0,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.39873331785202026,
+            "misses": 2,
+            "box": [
+              665,
+              439,
+              722,
+              476
+            ],
+            "centroid": [
+              693.5,
+              457.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "dropped (coasting)",
+          "why": "His tracker did not see it this frame (`misses` 2). His `latest()` leaves coasting tracks out, and so does nav."
+        },
+        {
+          "input": {
+            "id": 1,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "bolt",
+            "conf": 0.5138643682003021,
+            "misses": 0,
+            "box": [
+              11,
+              0,
+              1157,
+              612
+            ],
+            "centroid": [
+              584.0,
+              306.0
+            ]
+          },
+          "ground_px": [
+            584.0,
+            612.0
+          ],
+          "floor": {
+            "x_m": 0.27,
+            "y_m": 0.016,
+            "range_m": 0.27,
+            "bearing_deg": 3.3
+          },
+          "verdict": "**chosen**",
+          "why": "CONFIRM + PICK, and the nearest of 1 candidate(s), so nav drives at it. Projected from the bottom-centre, 306 px below the centroid. **The box spans 90% of the frame width** -- not a fastener, but nav has no size gate."
+        }
+      ]
+    }
+  ]
+}

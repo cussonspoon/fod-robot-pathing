@@ -175,7 +175,7 @@ stops — everything a real run checks except whether the robot drives well.
 uv run pytest
 ```
 
-Pure logic, no hardware, no serial port, no broker: about 1400 tests in under
+Pure logic, no hardware, no serial port, no broker: about 1370 tests in under
 four seconds. The simulated firmware means the protocol codec, the watchdog
 timing and the tick-wraparound arithmetic are all covered by ordinary unit
 tests rather than by a robot on a bench.

@@ -1,0 +1,9 @@
+cv_tests/2026-09-24/data/n640-c/raw_part01.jsonl: 780 records, 780 frames, 0 carrying an error
+  frame sizes      {'1280x720': 780} (calibrated at 1280x720)
+  targets          6471 over 780 frames (5 empty, which mean the floor is clear, not that vision died)
+      CONFIRM      5344  <- chased
+      CAUTION      1127
+  confirmed+PICK   5344
+  projected        6039 across 38 distinct track ids
+      rejected: 0 above the horizon or behind, 0 out of range
+      range: 0.23 to 1.017 m, median 0.424 m

@@ -4,7 +4,7 @@
 stable while this changes weekly. If this file and CLAUDE.md ever disagree about
 what is built, this one is right — and CLAUDE.md needs fixing.
 
-Last updated: **2026-09-10**, v0.2.0 (CV integration).
+Last updated: **2026-09-30**, v0.2.0 (CV integration) plus the first real CV captures.
 
 ---
 
@@ -24,7 +24,8 @@ state, not an outstanding task for nav: it is Teemy's file and nothing in it has
 been measured. Everything that needs one of those numbers fails at startup
 naming the field and its `docs/HARDWARE.md` procedure.
 
-Git: v0.1.0 is on `main`; the CV integration is on `feat/integrate-cv-library`.
+Git: v0.1.0 and the CV integration (PR #3) are both on `main`; the real-capture
+replay is on `feat/replay-real-cv-captures`.
 
 ## The vision interface changed under us (2026-09-10)
 
@@ -60,7 +61,7 @@ one in the control path, because it changes what is worth him tuning.
 
 ---
 
-## Schedule (exam ~2 Sep 2026 — delete this section after)
+## Schedule
 
 Ordered by dependency, not importance.
 
@@ -83,11 +84,13 @@ Ordered by dependency, not importance.
 
 ## What is actually blocking, in order
 
-- **One recording of real detector output.** Thirty seconds of `vision.detail()`
-  from his board as JSONL. `fodnav-replay` reads that format directly, so it
-  would check the field names, the box convention and the frame size in an
-  afternoon, with no robot and no camera on this side. **Ten minutes of his time,
-  and it is the cheapest real certainty available anywhere on this list.**
+- ~~**One recording of real detector output.**~~ **Done 2026-09-24.** Three
+  ~30 s captures from his board (`cv_tests/2026-09-24/data/`) parse with
+  zero problems, and nav's `latest()` matches his on all 2130 frames. See
+  `cv_tests/2026-09-24/output/summary.md`. It also records two things for
+  Bthcorn: a whole-frame box that reaches CONFIRM at start-up, which nav chases,
+  and one object often held as two tracks with different `cls`, which causes
+  52 of nav's 79 target switches.
 - **PRD O-3, the camera mount height and tilt.** Now the most contended number in
   the project: it stops his `lookahead` being a placeholder *and* stops our
   ground calibration being possible. Neither side moves without it, so ask

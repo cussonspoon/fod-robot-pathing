@@ -1,0 +1,37 @@
+{
+  "argv": [
+    "/home/ai/fod-robot-cv-poc/scripts/capture_raw.py",
+    "--conf",
+    "0.25",
+    "--focus",
+    "0.30",
+    "--out",
+    "runs/capture/n480-c",
+    "--hef",
+    "/home/ai/fod-robot/artifacts/arg-bolts-4-n-640/bench_int8_hailo_model_480/best.hef"
+  ],
+  "focus": 0.3,
+  "started": 1790234083.7284126,
+  "hef": "/home/ai/fod-robot/artifacts/arg-bolts-4-n-640/bench_int8_hailo_model_480/best.hef",
+  "classes": [
+    "bolt",
+    "nut",
+    "screw",
+    "washer"
+  ],
+  "frame_size": [
+    1280,
+    720
+  ],
+  "camera": {
+    "zoom": 1.0,
+    "rotate": 0,
+    "conf": 0.25,
+    "frame_size": [
+      1280,
+      720
+    ],
+    "imgsz": 480,
+    "focus_m": null
+  }
+}

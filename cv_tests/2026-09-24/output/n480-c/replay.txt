@@ -1,0 +1,9 @@
+cv_tests/2026-09-24/data/n480-c/raw_part01.jsonl: 887 records, 887 frames, 0 carrying an error
+  frame sizes      {'1280x720': 887} (calibrated at 1280x720)
+  targets          6965 over 887 frames (14 empty, which mean the floor is clear, not that vision died)
+      CONFIRM      5044  <- chased
+      CAUTION      1921
+  confirmed+PICK   5044
+  projected        5592 across 29 distinct track ids
+      rejected: 0 above the horizon or behind, 0 out of range
+      range: 0.23 to 0.808 m, median 0.363 m
