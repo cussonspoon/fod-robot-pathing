@@ -269,3 +269,43 @@ def test_a_broken_log_directory_does_not_stop_the_robot(robot, tmp_path):
     h = SimHarness(robot=robot, nav=nav_cfg(mission__mode="idle"), log=log)
     h.run(duration_s=2.0)
     assert h.loop.stats.ticks > 50
+
+
+def test_each_tick_reaches_the_file_before_the_next(tmp_path):
+    # A live display reads stream.jsonl while the run is going. Every line is
+    # one moment -- what nav saw and the command it sent -- and the file must
+    # not trail the serial line by more than a tick.
+    from fodnav.runlog import RunLog
+
+    log = RunLog(root=tmp_path, name="live", flush_every=1)
+    log.tick({"t": 0.00, "v": 0.265, "omega": -0.057, "reason": "servoing, 0.603 m, -1.8 deg"})
+    lines = (log.dir / "stream.jsonl").read_text().splitlines()
+    assert len(lines) == 1 and '"v":0.265' in lines[0]
+    log.close()
+
+
+def test_a_larger_flush_interval_holds_lines_back(tmp_path):
+    # What 0.5 s looked like: the lines exist, but not on disk yet.
+    from fodnav.runlog import RunLog
+
+    log = RunLog(root=tmp_path, name="batched", flush_every=25)
+    for i in range(24):
+        log.tick({"t": i * 0.02})
+    assert (log.dir / "stream.jsonl").read_text() == ""
+    log.tick({"t": 0.48})
+    assert len((log.dir / "stream.jsonl").read_text().splitlines()) == 25
+    log.close()
+
+
+def test_the_cli_run_log_takes_its_flush_interval_from_nav_yaml(tmp_path):
+    import argparse
+
+    from fodnav.cli._common import make_run_log
+
+    nav = nav_cfg(log__stream_flush_every=7)
+    robot = load_robot_config("config/sim_robot.yaml")
+    args = argparse.Namespace(log_dir=str(tmp_path), run_name="x", no_log=False)
+    log = make_run_log(args, "sim", robot, nav)
+    assert log.flush_every == 7
+    log.close()
+

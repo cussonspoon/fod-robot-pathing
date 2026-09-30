@@ -5,4 +5,4 @@ design rules, docs/protocol.md for the wire contract with the ESP32, and
 docs/HARDWARE.md for the measurements this package refuses to guess.
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"

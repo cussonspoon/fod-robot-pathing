@@ -9,6 +9,32 @@ shared contract and needs telling, not just recording.
 
 ---
 
+## 0.2.2 — 2026-09-30 — the run log keeps up with the wire
+
+`stream.jsonl` is flushed every tick instead of every 25.
+
+**Why.** The harness's live panel paired the last line of `stream.jsonl`
+(what nav saw: 0.603 m, -1.8 deg) with the last `V` from its serial tap
+(`V 0.199 -0.074`). With a 0.5 s flush those were up to half a second
+apart. The object had moved, so they looked like a controller bug. They
+weren't: each line of `stream.jsonl` is one tick, and its `v`/`omega` is
+exactly the command sent that tick (`runner.py` sends, then logs, the same
+`Command`). The panel should take both from one line; this change also
+makes the file itself near-live.
+
+**Cost.** A flush hands ~200 bytes to the OS page cache. There is still no
+fsync. On a laptop a tick's logging went from 2.1 to 3.3 us median, against
+a 20 000 us budget. Unmeasured on the Pi's SD card: check `worst_tick_ms` and
+`overruns` in the first Pi run's `summary.json`, and raise
+`log.stream_flush_every` if they move.
+
+### Changed
+- New `nav.yaml` key `log.stream_flush_every` (ticks, 1..500), default 1.
+  `make_run_log` passes it to `RunLog`, whose own default is now 1.
+- README "Reading nav's logs live" updated.
+
+---
+
 ## 0.2.1 — 2026-09-30 — a frozen camera no longer reads as a live one
 
 **Safety fix.** Found by the integration harness
