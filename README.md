@@ -9,6 +9,119 @@ between the two.
 
 Python package: `fodnav`. Console scripts: `fodnav-*`.
 
+## What the package does
+
+It is the part of the robot that decides where to go and drives there.
+
+1. **Reads the camera's detections** from Bthcorn's `fod-vision` library: boxes
+   in pixels, each with a track id and `CONFIRM` / `CAUTION`.
+2. **Turns a box into a spot on the floor**, in metres from the robot, using the
+   bottom edge of the box and a ground calibration.
+3. **Decides what to do**:
+   - **target** mode chases the nearest confirmed fastener and drives the drum over it;
+   - **coverage** mode sweeps a rectangle row by row.
+4. **Drives the wheels** by sending `V <speed> <turn>` to the ESP32 over serial,
+   50 times a second.
+5. **Stops safely**:
+   - when vision is lost;
+   - on any error;
+   - when the camera freezes (see v0.2.1 below).
+
+   The ESP32's watchdog stops the wheels if nav goes silent for 300 ms.
+6. **Records every run**: detections, commands, config and git SHA, in a log folder.
+
+It also runs **with no hardware at all**: a simulator stands in for the robot,
+the camera and the ESP32, so everything above can be tried on a laptop.
+
+| Command | What it does |
+|---|---|
+| `fodnav-sim` | The whole stack against a simulated robot, camera and ESP32 |
+| `fodnav-replay` | Feed a recorded camera log back through nav: what would it have done? |
+| `fodnav-run` | The real thing, on the Pi: camera → decisions → ESP32 |
+| `fodnav-teleop` | Drive the robot by keyboard, to check wiring and directions |
+| `fodnav-calib-ground` | Build the pixel → floor calibration from taped markers |
+
+## Install
+
+Latest: **[v0.2.1](https://github.com/cussonspoon/fod-robot-pathing/releases/tag/v0.2.1)**.
+Each release is a wheel on
+[GitHub Releases](https://github.com/cussonspoon/fod-robot-pathing/releases),
+the same way `fod-vision` ships. No need to clone this repo to run it.
+
+**Laptop** (simulator, replay, testing):
+
+```bash
+pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any directory
+```
+
+**Raspberry Pi**, inside the Python 3.11 venv created with `--system-site-packages`:
+
+```bash
+sudo apt install python3-serial python3-yaml
+pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+```
+
+`--no-deps` is required on the Pi:
+
+- numpy and OpenCV come from apt with `python3-picamera2`;
+- pip does not recognise apt's OpenCV;
+- so without the flag it installs a second copy underneath the camera software.
+
+**A real run** needs your own config folder and model file:
+
+```bash
+fodnav-run --config-dir /path/to/config --set detections.hef=/path/to/best.hef
+```
+
+The package carries a copy of `config/`, so the simulator runs anywhere. That
+copy's `robot.yaml` has no measured values on purpose, so a real run refuses to
+start until you point it at a folder holding a measured `robot.yaml`, `nav.yaml`
+and `ground_homography.json`.
+
+## What's new in v0.2.1
+
+- **Safety: a frozen camera now stops the robot.**
+  - The vision library keeps returning its last picture when the camera
+    freezes, and nav used to treat each read as a new picture, so it kept
+    driving toward a frozen image.
+  - Nav now accepts a picture only when its frame number changes, so a freeze
+    stops the robot 0.4 s after the last real picture.
+  - Found by the integration harness
+    ([JuniorSE15/fod-robot](https://github.com/JuniorSE15/fod-robot)).
+- **Installable package:**
+  - config included;
+  - runs from any folder;
+  - version minimums match the Pi (numpy ≥ 1.24, opencv ≥ 4.6, Python 3.11).
+- **First real camera recordings replayed** (`cv_tests/2026-09-24/`):
+  - nav reads all 2130 frames from Bthcorn's board, identically to his library;
+  - notes for him: one object often gets two tracks, and a whole-screen box can
+    be chased at start-up.
+- **Simulator:** its camera now behaves like the real library, so tests catch
+  this kind of bug. 1378 tests.
+
+Full history: [`docs/CHANGELOG.md`](docs/CHANGELOG.md).
+
+## Reading nav's logs live (for dashboards)
+
+If you build a display on top of a run, know how fresh each file is. Each one
+is written on a different schedule:
+
+| File | Written to disk | So its last line is |
+|---|---|---|
+| `stream.jsonl`: state, `v`, `omega`, `reason` (range and bearing), pose | every 25 ticks (0.5 s), to keep the 50 Hz loop off the SD card | up to **0.5 s old** |
+| `detections.jsonl`: vision's `detail()`, one per frame | every frame | up to ~33 ms old |
+| The serial line itself (`V ...`, if you tap it) | as it is sent | live, ≤ 20 ms |
+
+Every line of `stream.jsonl` is **one moment**: the `reason` (what nav saw) and
+the `v`/`omega` (what it sent) belong together.
+
+- **Take a decision and its command from the same line.**
+- Don't pair a `stream.jsonl` line with a live `V` from the serial line. They
+  can be up to half a second apart, and the numbers will look like they
+  disagree when nothing is wrong.
+- Show the line's own `t` next to it, so the delay is visible.
+
 ## Where things are written down
 
 | | |
@@ -69,7 +182,9 @@ with `--system-site-packages`. Do not add `picamera2`, `hailo_platform` or
 `fod-vision` to this repo's dependencies: `link/vision.py` imports the library
 lazily so everything here stays runnable on a laptop.
 
-## Setup
+## Setup, for working on this repo
+
+To *run* nav, install the package (above). To *change* it:
 
 ```bash
 uv sync
@@ -79,36 +194,6 @@ Python **3.11** on the Pi (the vision library needs apt's 3.11 camera stack;
 create the venv with `--system-site-packages`). Runtime dependencies are
 `numpy`, `pyserial`, `pyyaml`, `opencv-python-headless` — and that list is a budget, not a starting
 point. Two CPU cores and a Raspberry Pi. Ask before adding to it.
-
-## Installing the released package
-
-Each release is a wheel on
-[GitHub Releases](https://github.com/cussonspoon/fod-robot-pathing/releases),
-the same way `fod-vision` ships. Use it instead of cloning when you only need to
-*run* nav — for example from the integration harness.
-
-On a laptop, with dependencies:
-
-```bash
-pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
-fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any directory
-```
-
-On the Pi, into the 3.11 venv created with `--system-site-packages`, **with
-`--no-deps`**: numpy and cv2 come from apt under `python3-picamera2`, and pip does
-not recognise apt's cv2 as `opencv-python-headless`, so without the flag it would
-install a second OpenCV underneath the camera stack.
-
-```bash
-sudo apt install python3-serial python3-yaml
-pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
-```
-
-The wheel carries a copy of `config/`, so the sim runs anywhere. That copy's
-`robot.yaml` is the all-`null` template, so a real run still refuses to start
-until it gets measured values: pass your own directory with
-`fodnav-run --config-dir /path/to/config` (holding `robot.yaml`, `nav.yaml` and
-`ground_homography.json`), and an absolute `--set detections.hef=/path/to/best.hef`.
 
 ## Running with no hardware
 
@@ -188,13 +273,8 @@ silently becomes load-bearing is worse than a crash.
 
 ## Commands
 
-| | |
-|---|---|
-| `fodnav-sim` | the whole stack against simulated hardware |
-| `fodnav-run` | the real thing: MQTT vision, serial to the ESP32, 50 Hz |
-| `fodnav-teleop` | drive by hand, with the heartbeat maintained |
-| `fodnav-calib-ground` | solve the pixel-to-floor homography |
-| `fodnav-replay` | feed a recorded detection log back through the stack |
+The five commands are listed under [What the package does](#what-the-package-does).
+Each takes `--help`.
 
 `fodnav-run --dry-run` loads the config, opens the link, runs the handshake and
 stops — everything a real run checks except whether the robot drives well.
