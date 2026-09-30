@@ -24,7 +24,7 @@ from ..control import MotionLimits
 from ..frames import Pose2D
 from ..fsm import Mode, NavFsm
 from ..ground import GroundProjector
-from ..link.vision import QueueVisionSource
+from ..link.vision import LibraryVisionSource, QueueVisionSource
 from ..link.esp32 import Esp32Link
 from ..odom import Odometry
 from ..planner.boustrophedon import Rect
@@ -33,7 +33,7 @@ from ..runlog import RunLog
 from ..runner import ControlLoop, SimClock
 from .camera import SimCamera
 from .firmware import FakeFirmware, FirmwareConstants, build_sim_link
-from .scene import SceneNoise, SimScene
+from .scene import SceneNoise, SimScene, SimVision
 from .unicycle import SimParams, UnicycleSim
 
 __all__ = ["SimHarness"]
@@ -51,6 +51,11 @@ class SimHarness:
     vision_rate_hz: float = 30.0
     firmware_constants: FirmwareConstants | None = None
     vision_dead_after_s: float | None = None  # inject a vision dropout
+    # Read vision the way the Pi does: LibraryVisionSource polling a Vision-like
+    # object. False keeps the push-style QueueVisionSource. The difference only
+    # shows when frames stop: a queue goes quiet, his library keeps returning
+    # the last frame (see SimVision).
+    library_vision: bool = False
 
     def __post_init__(self) -> None:
         self.camera = SimCamera(self.robot)
@@ -70,7 +75,13 @@ class SimHarness:
             on_log=self._on_firmware_log,
         )
         self.sim: UnicycleSim = self.firmware.sim
-        self.source = QueueVisionSource()
+        self.vision: SimVision | None = None
+        if self.library_vision:
+            self.vision = SimVision(self.scene, now=lambda: self.clock.t)
+            self.source = LibraryVisionSource(hef="sim")
+            self.source.attach(self.vision)
+        else:
+            self.source = QueueVisionSource()
         self.odom = Odometry.from_config(self.robot, pose=self.start_pose)
         self.odom.update(*self.sim.ticks)
 
@@ -110,7 +121,11 @@ class SimHarness:
             self._next_frame += self._vision_period
             if self.vision_dead_after_s is not None and t >= self.vision_dead_after_s:
                 return  # the camera process died; nav must notice and stop
-            self.source.offer(self.scene.render(self.sim.true_pose, t))
+            detail = self.scene.render(self.sim.true_pose, t)
+            if self.vision is not None:
+                self.vision.complete(detail, t)
+            else:
+                self.source.offer(detail)
             self.frames_published += 1
 
     def _on_firmware_log(self, line) -> None:

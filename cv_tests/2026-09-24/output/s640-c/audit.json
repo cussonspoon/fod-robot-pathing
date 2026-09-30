@@ -1,0 +1,441 @@
+{
+  "capture": "cv_tests/2026-09-24/data/s640-c",
+  "hef": "/home/ai/fod-robot/artifacts/arg-bolts-4-s-640/bench_int8_hailo_model/best.hef",
+  "imgsz": 640,
+  "host_conf": 0.25,
+  "parse": {
+    "lines": 463,
+    "bad_json": 0,
+    "frames_parsed": 463,
+    "problems": {},
+    "first_example": {},
+    "extra_top_level_keys": {
+      "t": 463,
+      "targets": 463
+    },
+    "non_finite_values": {},
+    "frame_sizes": {
+      "1280x720": 463
+    }
+  },
+  "latest_reconstruction": {
+    "frames_with_his_targets": 463,
+    "frames_without": 0,
+    "match": 463,
+    "mismatch": 0,
+    "targets_ours": 3040,
+    "targets_his": 3040
+  },
+  "stream": {
+    "duration_s": 32.73,
+    "frame_id_first_last": [
+      1,
+      653
+    ],
+    "frame_id_non_monotonic": 0,
+    "frames_skipped_in_log": 190,
+    "effective_fps": 14.1,
+    "dt_ms_median_p95": [
+      50.1,
+      151.9
+    ],
+    "infer_ms_median_p95": [
+      45.3,
+      47.1
+    ],
+    "total_ms_median_p95": [
+      50.0,
+      52.1
+    ],
+    "error_frames": 0,
+    "blocked_frames": 187
+  },
+  "tracks": {
+    "track_rows": 3746,
+    "coasting_rows": 706,
+    "distinct_ids": 105,
+    "by_state": {
+      "CAUTION": 839,
+      "CONFIRM": 2907
+    },
+    "by_action": {
+      "PICK": 3746
+    },
+    "state_transitions": {
+      "CAUTION->CONFIRM": 22
+    },
+    "ids_whose_cls_flips": 37,
+    "cls_flip_examples": {
+      "1": [
+        "bolt",
+        "screw"
+      ],
+      "11": [
+        "bolt",
+        "screw"
+      ],
+      "12": [
+        "bolt",
+        "screw"
+      ],
+      "13": [
+        "bolt",
+        "screw"
+      ],
+      "14": [
+        "bolt",
+        "screw"
+      ]
+    },
+    "confirmed_boxes_over_80pct_frame_width": [],
+    "duplicates": {
+      "iou_threshold": 0.7,
+      "frames_with_a_duplicate": 201,
+      "frames_with_a_confirmed_duplicate": 133,
+      "distinct_id_pairs": 55,
+      "pairs_cls_differs": 257,
+      "pairs_cls_same": 3
+    },
+    "ground_below_centroid_px_median_max": [
+      22.5,
+      102.5
+    ]
+  },
+  "nav": {
+    "calibration": "config/sim_ground_homography.json",
+    "calibration_is_fictional": true,
+    "chased_target_rows": 2634,
+    "distinct_chased_ids": 36,
+    "projected": 2634,
+    "rejected_by_projector": 0,
+    "projector_stats": {
+      "rejected_horizon": 0,
+      "rejected_range": 0
+    },
+    "range_m_min_median_max": [
+      0.232,
+      0.445,
+      1.006
+    ],
+    "frames_with_a_best_target": 383,
+    "best_target_switches": 33,
+    "best_target_switches_between_duplicates": 28,
+    "best_target_ids": {
+      "43": 142,
+      "1": 130,
+      "58": 65,
+      "11": 30,
+      "0": 9
+    }
+  },
+  "examples": [
+    {
+      "title": "a typical frame, with as many kinds of row as possible",
+      "source": "raw_part01.jsonl:120",
+      "frame_id": 154,
+      "frame_size": [
+        1280,
+        720
+      ],
+      "blocked": false,
+      "tracks": [
+        {
+          "id": 1,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.5369981280637912,
+          "misses": 0,
+          "box": [
+            477,
+            209,
+            535,
+            253
+          ],
+          "centroid": [
+            506.0,
+            231.0
+          ]
+        },
+        {
+          "id": 11,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "bolt",
+          "conf": 0.6014153721046448,
+          "misses": 0,
+          "box": [
+            477,
+            207,
+            534,
+            253
+          ],
+          "centroid": [
+            505.5,
+            230.0
+          ]
+        },
+        {
+          "id": 12,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "bolt",
+          "conf": 0.3553515779972076,
+          "misses": 0,
+          "box": [
+            490,
+            137,
+            546,
+            175
+          ],
+          "centroid": [
+            518.0,
+            156.0
+          ]
+        },
+        {
+          "id": 13,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "bolt",
+          "conf": 0.3097579959869385,
+          "misses": 0,
+          "box": [
+            410,
+            177,
+            499,
+            211
+          ],
+          "centroid": [
+            454.5,
+            194.0
+          ]
+        },
+        {
+          "id": 14,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.3098051369190216,
+          "misses": 2,
+          "box": [
+            413,
+            177,
+            502,
+            212
+          ],
+          "centroid": [
+            457.5,
+            194.5
+          ]
+        }
+      ],
+      "chased": [
+        {
+          "id": 1,
+          "conf": 0.537,
+          "cls": "screw",
+          "box": [
+            477,
+            209,
+            535,
+            253
+          ],
+          "ground_px": [
+            506.0,
+            253.0
+          ],
+          "projected": {
+            "x_m": 0.579,
+            "y_m": 0.075,
+            "range_m": 0.584,
+            "bearing_deg": 7.4
+          }
+        },
+        {
+          "id": 11,
+          "conf": 0.601,
+          "cls": "bolt",
+          "box": [
+            477,
+            207,
+            534,
+            253
+          ],
+          "ground_px": [
+            505.5,
+            253.0
+          ],
+          "projected": {
+            "x_m": 0.579,
+            "y_m": 0.076,
+            "range_m": 0.584,
+            "bearing_deg": 7.5
+          }
+        }
+      ],
+      "held": {
+        "2": {
+          "age_s": 0.299,
+          "x_m": 0.712,
+          "y_m": -0.137,
+          "range_m": 0.725,
+          "bearing_deg": -10.9
+        }
+      },
+      "best": 1,
+      "rows": [
+        {
+          "input": {
+            "id": 1,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.5369981280637912,
+            "misses": 0,
+            "box": [
+              477,
+              209,
+              535,
+              253
+            ],
+            "centroid": [
+              506.0,
+              231.0
+            ]
+          },
+          "ground_px": [
+            506.0,
+            253.0
+          ],
+          "floor": {
+            "x_m": 0.579,
+            "y_m": 0.075,
+            "range_m": 0.584,
+            "bearing_deg": 7.4
+          },
+          "verdict": "**chosen**",
+          "why": "CONFIRM + PICK, and the nearest of 3 candidate(s), so nav drives at it. Projected from the bottom-centre, 22 px below the centroid. **Same object as id 11** (IoU 0.94, `screw` vs `bolt`): his tracker holds one object as two tracks."
+        },
+        {
+          "input": {
+            "id": 11,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "bolt",
+            "conf": 0.6014153721046448,
+            "misses": 0,
+            "box": [
+              477,
+              207,
+              534,
+              253
+            ],
+            "centroid": [
+              505.5,
+              230.0
+            ]
+          },
+          "ground_px": [
+            505.5,
+            253.0
+          ],
+          "floor": {
+            "x_m": 0.579,
+            "y_m": 0.076,
+            "range_m": 0.584,
+            "bearing_deg": 7.5
+          },
+          "verdict": "candidate",
+          "why": "CONFIRM + PICK, projected from the bottom-centre. Not chosen: id 1 is nearer (0.584 m against 0.584 m, a tie at the millimetre). **Same object as id 1** (IoU 0.94, `bolt` vs `screw`): his tracker holds one object as two tracks."
+        },
+        {
+          "input": {
+            "id": 12,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "bolt",
+            "conf": 0.3553515779972076,
+            "misses": 0,
+            "box": [
+              490,
+              137,
+              546,
+              175
+            ],
+            "centroid": [
+              518.0,
+              156.0
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.36; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        },
+        {
+          "input": {
+            "id": 13,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "bolt",
+            "conf": 0.3097579959869385,
+            "misses": 0,
+            "box": [
+              410,
+              177,
+              499,
+              211
+            ],
+            "centroid": [
+              454.5,
+              194.0
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.31; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        },
+        {
+          "input": {
+            "id": 14,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.3098051369190216,
+            "misses": 2,
+            "box": [
+              413,
+              177,
+              502,
+              212
+            ],
+            "centroid": [
+              457.5,
+              194.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "dropped (coasting)",
+          "why": "His tracker did not see it this frame (`misses` 2). His `latest()` leaves coasting tracks out, and so does nav."
+        },
+        {
+          "input": null,
+          "id": 2,
+          "ground_px": null,
+          "floor": {
+            "age_s": 0.299,
+            "x_m": 0.712,
+            "y_m": -0.137,
+            "range_m": 0.725,
+            "bearing_deg": -10.9
+          },
+          "verdict": "held",
+          "why": "Gone from his list, but last seen as CONFIRM 0.299 s ago, inside `detections.max_age_s`, so it is still a candidate."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,391 @@
+{
+  "capture": "cv_tests/2026-09-24/data/n480-c",
+  "hef": "/home/ai/fod-robot/artifacts/arg-bolts-4-n-640/bench_int8_hailo_model_480/best.hef",
+  "imgsz": 480,
+  "host_conf": 0.25,
+  "parse": {
+    "lines": 887,
+    "bad_json": 0,
+    "frames_parsed": 887,
+    "problems": {},
+    "first_example": {},
+    "extra_top_level_keys": {
+      "t": 887,
+      "targets": 887
+    },
+    "non_finite_values": {},
+    "frame_sizes": {
+      "1280x720": 887
+    }
+  },
+  "latest_reconstruction": {
+    "frames_with_his_targets": 887,
+    "frames_without": 0,
+    "match": 887,
+    "mismatch": 0,
+    "targets_ours": 6965,
+    "targets_his": 6965
+  },
+  "stream": {
+    "duration_s": 29.63,
+    "frame_id_first_last": [
+      3,
+      892
+    ],
+    "frame_id_non_monotonic": 0,
+    "frames_skipped_in_log": 3,
+    "effective_fps": 29.9,
+    "dt_ms_median_p95": [
+      29.3,
+      62.9
+    ],
+    "infer_ms_median_p95": [
+      10.9,
+      11.5
+    ],
+    "total_ms_median_p95": [
+      33.2,
+      39.0
+    ],
+    "error_frames": 0,
+    "blocked_frames": 594
+  },
+  "tracks": {
+    "track_rows": 8882,
+    "coasting_rows": 1917,
+    "distinct_ids": 211,
+    "by_state": {
+      "CAUTION": 3465,
+      "CONFIRM": 5417
+    },
+    "by_action": {
+      "PICK": 8882
+    },
+    "state_transitions": {
+      "CAUTION->CONFIRM": 25
+    },
+    "ids_whose_cls_flips": 73,
+    "cls_flip_examples": {
+      "1": [
+        "bolt",
+        "screw"
+      ],
+      "3": [
+        "bolt",
+        "nut",
+        "screw"
+      ],
+      "4": [
+        "bolt",
+        "screw"
+      ],
+      "7": [
+        "bolt",
+        "screw"
+      ],
+      "9": [
+        "bolt",
+        "screw"
+      ]
+    },
+    "confirmed_boxes_over_80pct_frame_width": [],
+    "duplicates": {
+      "iou_threshold": 0.7,
+      "frames_with_a_duplicate": 289,
+      "frames_with_a_confirmed_duplicate": 88,
+      "distinct_id_pairs": 84,
+      "pairs_cls_differs": 360,
+      "pairs_cls_same": 3
+    },
+    "ground_below_centroid_px_median_max": [
+      22.5,
+      82.5
+    ]
+  },
+  "nav": {
+    "calibration": "config/sim_ground_homography.json",
+    "calibration_is_fictional": true,
+    "chased_target_rows": 5044,
+    "distinct_chased_ids": 29,
+    "projected": 5044,
+    "rejected_by_projector": 0,
+    "projector_stats": {
+      "rejected_horizon": 0,
+      "rejected_range": 0
+    },
+    "range_m_min_median_max": [
+      0.23,
+      0.368,
+      0.808
+    ],
+    "frames_with_a_best_target": 699,
+    "best_target_switches": 13,
+    "best_target_switches_between_duplicates": 7,
+    "best_target_ids": {
+      "52": 349,
+      "3": 127,
+      "135": 62,
+      "42": 51,
+      "72": 51
+    }
+  },
+  "examples": [
+    {
+      "title": "a typical frame, with as many kinds of row as possible",
+      "source": "raw_part01.jsonl:199",
+      "frame_id": 204,
+      "frame_size": [
+        1280,
+        720
+      ],
+      "blocked": false,
+      "tracks": [
+        {
+          "id": 3,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.4069373574081584,
+          "misses": 0,
+          "box": [
+            765,
+            242,
+            824,
+            268
+          ],
+          "centroid": [
+            794.5,
+            255.0
+          ]
+        },
+        {
+          "id": 19,
+          "state": "CONFIRM",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.46651381266043457,
+          "misses": 0,
+          "box": [
+            815,
+            286,
+            864,
+            336
+          ],
+          "centroid": [
+            839.5,
+            311.0
+          ]
+        },
+        {
+          "id": 32,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.41828539283386323,
+          "misses": 0,
+          "box": [
+            732,
+            176,
+            779,
+            205
+          ],
+          "centroid": [
+            755.5,
+            190.5
+          ]
+        },
+        {
+          "id": 34,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.2950889215763751,
+          "misses": 1,
+          "box": [
+            955,
+            209,
+            1002,
+            230
+          ],
+          "centroid": [
+            978.5,
+            219.5
+          ]
+        },
+        {
+          "id": 35,
+          "state": "CAUTION",
+          "action": "PICK",
+          "cls": "screw",
+          "conf": 0.35061841697802976,
+          "misses": 0,
+          "box": [
+            594,
+            156,
+            646,
+            195
+          ],
+          "centroid": [
+            620.0,
+            175.5
+          ]
+        }
+      ],
+      "chased": [
+        {
+          "id": 19,
+          "conf": 0.467,
+          "cls": "screw",
+          "box": [
+            815,
+            286,
+            864,
+            336
+          ],
+          "ground_px": [
+            839.5,
+            336.0
+          ],
+          "projected": {
+            "x_m": 0.462,
+            "y_m": -0.091,
+            "range_m": 0.471,
+            "bearing_deg": -11.1
+          }
+        }
+      ],
+      "held": {},
+      "best": 19,
+      "rows": [
+        {
+          "input": {
+            "id": 3,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.4069373574081584,
+            "misses": 0,
+            "box": [
+              765,
+              242,
+              824,
+              268
+            ],
+            "centroid": [
+              794.5,
+              255.0
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.41; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        },
+        {
+          "input": {
+            "id": 19,
+            "state": "CONFIRM",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.46651381266043457,
+            "misses": 0,
+            "box": [
+              815,
+              286,
+              864,
+              336
+            ],
+            "centroid": [
+              839.5,
+              311.0
+            ]
+          },
+          "ground_px": [
+            839.5,
+            336.0
+          ],
+          "floor": {
+            "x_m": 0.462,
+            "y_m": -0.091,
+            "range_m": 0.471,
+            "bearing_deg": -11.1
+          },
+          "verdict": "**chosen**",
+          "why": "CONFIRM + PICK, and the nearest of 1 candidate(s), so nav drives at it. Projected from the bottom-centre, 25 px below the centroid. Conf 0.47 is under 0.5, but his latch holds CONFIRM until 0.25."
+        },
+        {
+          "input": {
+            "id": 32,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.41828539283386323,
+            "misses": 0,
+            "box": [
+              732,
+              176,
+              779,
+              205
+            ],
+            "centroid": [
+              755.5,
+              190.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.42; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        },
+        {
+          "input": {
+            "id": 34,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.2950889215763751,
+            "misses": 1,
+            "box": [
+              955,
+              209,
+              1002,
+              230
+            ],
+            "centroid": [
+              978.5,
+              219.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "dropped (coasting)",
+          "why": "His tracker did not see it this frame (`misses` 1). His `latest()` leaves coasting tracks out, and so does nav."
+        },
+        {
+          "input": {
+            "id": 35,
+            "state": "CAUTION",
+            "action": "PICK",
+            "cls": "screw",
+            "conf": 0.35061841697802976,
+            "misses": 0,
+            "box": [
+              594,
+              156,
+              646,
+              195
+            ],
+            "centroid": [
+              620.0,
+              175.5
+            ]
+          },
+          "ground_px": null,
+          "floor": null,
+          "verdict": "ignored (CAUTION)",
+          "why": "In `latest()`, but his tracker has not confirmed it (conf 0.35; CONFIRM needs 0.5). Nav chases CONFIRM only and adds no hysteresis of its own."
+        }
+      ]
+    }
+  ]
+}

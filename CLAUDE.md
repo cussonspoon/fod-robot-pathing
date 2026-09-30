@@ -15,6 +15,21 @@ Read `docs/protocol.md` before touching anything in `src/fodnav/link/`.
 
 ---
 
+## Action required from you
+
+Things Claude Code cannot do itself — they need hardware, another person, or a
+decision only you can make. Updated at each handoff.
+
+| Status | Action | Why it's blocked here | Since |
+|---|---|---|---|
+| PENDING | **Measure the camera mount (PRD O-3): height, down-tilt, and `fov_near_limit_m`.** Then re-run the ground calibration. | Needs the physical robot. It is the most contended number in the project: it sets Bthcorn's `lookahead` *and* our blind leg *and* the homography, and all three are invalid until it is fixed and recorded. | 2026-08-28 |
+| PENDING | **Install `fod-vision` into a 3.11 venv on the Pi** (`--system-site-packages`) and run `fodnav-run` once. | Needs the Pi. `LibraryVisionSource.start()` has never executed anywhere — the 2026-09-24 recordings came from his `capture_raw.py`, not from our adapter. | 2026-09-10 |
+| PENDING | **Get Teemy to review `docs/protocol.md`**, including the two amendments listed in `docs/CHANGELOG.md` (millimetre lengths in the `I` handshake; watchdog arms on first command). | It is a proposal he has not agreed to. If he implements something else, `link/esp32.py` is wrong. | 2026-08-28 |
+| DONE | Get a 30 s `detail()` recording from Bthcorn's board and replay it. Three captures, 2130 frames, nav's `latest()` matches his on every one — `cv_tests/2026-09-24/output/summary.md`. | — | 2026-09-24 |
+| DONE | Push `feat/integrate-cv-library` to origin (merged to `main` as PR #3). | — | 2026-09-10 |
+
+---
+
 ## 0. Current state — read first
 
 **The repo is built and §4 exists. Do not re-scaffold.** Schedule items 0–6 are
@@ -29,7 +44,7 @@ The whole stack runs on a laptop with no camera, no Pi and no robot:
 ```bash
 uv run fodnav-sim --set mission.mode=target --target 1.4 0.35   # chase a nail
 uv run fodnav-sim --duration 400                                # sweep the arena
-uv run pytest                                                   # ~1400 tests, <4 s
+uv run pytest                                                   # ~1370 tests, <4 s
 ```
 
 `fodnav-sim` runs the *real* control loop, FSM, protocol codec and projection
@@ -588,6 +603,13 @@ Each of these costs a session. Add to this list when you find a new one.
   simulation has no relationship to the run, so a vision-timeout test passes for
   the wrong reason and the dropout path is never actually exercised. It is also
   the right thing on hardware: it is the loop that has to notice.
+- **A frozen camera answers every read.** His `detail()` returns the last
+  *completed* frame on every call, with `age` growing, so a stalled capture
+  thread looks exactly like a healthy camera read twice. `LibraryVisionSource`
+  offers a frame only when `frame_id` changes; without that the vision
+  heartbeat never lapses and nav chases a picture. A push-style
+  `QueueVisionSource` cannot show this -- it just goes quiet -- so test anything
+  about frame arrival with `SimHarness(library_vision=True)` as well.
 - **Do not re-implement the vision library's tracking.** It already associates
   on an 80 px radius and applies confidence hysteresis (CONFIRM at 0.5, latched
   until 0.25), and it hands back stable ids. `target.py` used to do all three
@@ -601,6 +623,16 @@ Each of these costs a session. Add to this list when you find a new one.
   The vision source drops the oldest frames when the loop stalls, because acting
   on a stale box is worse than not acting. Replay inherited that bound and
   silently discarded 57% of a recorded log before anyone noticed the frame count.
+- **A chase that "fails" is usually the range gate, not the controller.**
+  `GroundProjector` refuses to project past `camera.fov_far_limit_m` (1.6 m in
+  the sim config) rather than extrapolating the calibration, so a target beyond
+  it produces `None` every frame, the FSM never acquires, and the robot sits
+  still looking broken. Fifty randomised chases over a spread *wider* than the
+  camera catch 39/50; restricted to the declared envelope they catch 50/50.
+  Before debugging the servo, check the target was inside the envelope --
+  `GroundProjector.stats()` counts `n_rejected_range` for exactly this.
+  **Never quote a catch rate without saying which envelope it was sampled from.**
+  See `docs/SIM_FINDINGS.md` section 7.
 - **Three decimal places on the wire cannot express a 1e-6 tolerance.** A
   32.5 mm wheel radius in metres encodes as `0.032`, so the `I` handshake could
   never pass. The two lengths travel as millimetres for exactly this reason; see

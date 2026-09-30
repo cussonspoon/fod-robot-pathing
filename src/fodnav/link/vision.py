@@ -331,6 +331,8 @@ class LibraryVisionSource(_BaseSource):
         self._vision = None
         self._cm = None
         self.failed = False
+        self._last_frame_id: int | None = None
+        self.n_repeats = 0      # polls that found no new frame: normal at 50 Hz vs 30 FPS
 
     def start(self) -> None:
         from fodcv.runtime.vision import Vision  # noqa: PLC0415 - Pi-only, see docstring
@@ -341,6 +343,16 @@ class LibraryVisionSource(_BaseSource):
         # by a dead process, so it is entered and exited explicitly.
         self._vision = self._cm.__enter__()
 
+    def attach(self, vision: Any) -> None:
+        """Read from an object that already behaves like an entered ``Vision``.
+
+        For the simulator and tests: :meth:`start` is the real path, and it is
+        the only one that imports ``fodcv``. Anything with ``detail()`` and
+        ``age`` will do, which is what lets the laptop exercise *this* class --
+        the one that runs on the Pi -- rather than a stand-in for it.
+        """
+        self._vision = vision
+
     def stop(self) -> None:
         if self._cm is not None:
             try:
@@ -350,22 +362,35 @@ class LibraryVisionSource(_BaseSource):
             self._cm = self._vision = None
 
     def poll(self) -> list[VisionFrame]:
-        """Read one frame. Never raises into the control loop.
+        """Read one frame, and offer it only if it is new. Never raises into the loop.
 
         His reads re-raise the capture thread's exception, deliberately, so that
         a dead camera cannot look like a clear floor. That exception is caught
-        here and carried on the frame as ``error`` -- the FSM stops on it, and
-        the vision timeout stops the robot anyway if reads stop entirely.
+        here and carried on the frame as ``error`` -- the FSM stops on it.
+
+        ``detail()`` returns the last *completed* frame on every call. So a
+        camera that has stalled -- thread alive, no new frames -- answers every
+        poll with the same frame and a growing ``age``, which looks exactly like
+        a healthy camera read twice. Offering it again would keep the vision
+        heartbeat alive on a frozen picture, and nav would chase whatever was
+        in it. A frame is therefore offered once, when its ``frame_id`` is new;
+        a stall then means no frames, the heartbeat lapses after
+        ``loop.vision_timeout_ms``, and the FSM stops. Before his first frame
+        ``age`` is infinite and nothing is offered, for the same reason.
         """
         if self._vision is None or self.failed:
             return []
         try:
             detail = self._vision.detail()          # never raises; has error inside
             frame = parse_detail(detail)
-            if self.log is not None:
-                self.log.write(detail)
             if frame.error:
                 self.failed = True                  # terminal: build a new source
+            elif math.isinf(frame.age_s) or frame.frame_id == self._last_frame_id:
+                self.n_repeats += 1
+                return super().poll()
+            self._last_frame_id = frame.frame_id
+            if self.log is not None:
+                self.log.write(detail)              # one line per frame, not per poll
             self._offer(frame)
         except Exception as e:                       # pragma: no cover - hardware only
             self.failed = True

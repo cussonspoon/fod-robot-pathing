@@ -17,14 +17,16 @@ up in simulation instead of on demo day.
 
 from __future__ import annotations
 
+import math
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from ..frames import Pose2D
 from ..link.vision import CAUTION, CONFIRM, IGNORE, PICK
 from .camera import SimCamera, SimObject
 
-__all__ = ["SimScene", "SceneNoise"]
+__all__ = ["SimScene", "SceneNoise", "SimVision"]
 
 
 @dataclass(frozen=True)
@@ -147,3 +149,43 @@ class SimScene:
             self._ids[key] = self._next_id
             self._next_id += 1
         return self._ids[key]
+
+
+class SimVision:
+    """His ``Vision`` object as the control loop sees it: a *pull*, not a push.
+
+    ``detail()`` returns the last **completed** frame every time it is asked,
+    with ``age`` growing from when that frame completed. That is the behaviour
+    a push-style :class:`~fodnav.link.vision.QueueVisionSource` cannot model:
+    when his capture thread stalls, reads keep succeeding and keep returning
+    the same frame. Driving :class:`~fodnav.link.vision.LibraryVisionSource`
+    from this is what lets the simulator exercise the Pi's code path.
+    """
+
+    def __init__(self, scene: SimScene, now: Callable[[], float]) -> None:
+        self._scene = scene
+        self._now = now
+        self._last: dict | None = None
+        self._t_last = 0.0
+
+    def complete(self, detail: dict, t: float) -> None:
+        """His thread finished a frame."""
+        self._last = detail
+        self._t_last = t
+
+    @property
+    def age(self) -> float:
+        return math.inf if self._last is None else max(0.0, self._now() - self._t_last)
+
+    def detail(self) -> dict:
+        if self._last is None:
+            cam = self._scene.camera
+            return {
+                "frame_id": 0, "age": math.inf, "blocked": False, "fps": 0.0,
+                "stage_ms": {}, "top_scores": {},
+                "camera": {"zoom": 1.0, "rotate": 0, "conf": 0.25,
+                           "frame_size": [cam.width_px, cam.height_px],
+                           "imgsz": 640, "focus_m": None},
+                "tracks": [], "error": None,
+            }
+        return {**self._last, "age": self.age}

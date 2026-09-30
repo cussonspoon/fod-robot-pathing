@@ -51,22 +51,38 @@ jitter.
 uv run fodnav-sim --set mission.mode=target --target 1.4 0.35 --duration 30
 ```
 
-## 3. The terminal blind leg is real and it is 33 cm
+## 3. The terminal blind leg is real and it is 31 cm
 
-On the simulated mount geometry the target leaves the frame at 0.267 m and the
-drum sits 0.060 m behind the axle, so **the robot drives 0.33 m after it can no
-longer see what it is driving at.** In the traces the handover is visible as a
-clean state change with no speed discontinuity:
+**Re-measured after the v0.3.0 vision integration changed the mount geometry**
+(0.180 m / 25 deg, a 66 deg lens, `fov_near_limit_m` 0.2297). The earlier
+edition of this section said 0.267 m and 33 cm; those came from the 102 deg
+fiction and are gone.
+
+The target leaves the frame at 0.2297 m, the drum sits 0.060 m behind the axle
+and `servo.blind_leg_extra_m` adds 0.02 m, so **the robot drives 0.31 m after
+it can no longer see what it is driving at.** In the traces the handover is
+visible as a clean state change with no speed discontinuity:
 
 ```
- 5.02 servoing    v=0.133  servoing, 0.272 m, +0.1 deg
- 5.08 blind_leg   v=0.138  blind leg, 0.345 m to go
- 8.92 arrived     v=0.000  drum over target after 0.345 m
+ 0.02 servoing    v=0.256  servoing, 1.415 m, +14.0 deg
+ 5.08 blind_leg   v=0.124  blind leg, 0.309 m to go
+ 8.64 arrived     v=0.000  drum over target after 0.310 m
 ```
+
+Drift over a leg that short is not what makes the robot miss. Commanding the
+same chassis straight, with the same error model:
+
+| Distance driven open-loop | Lateral error | Heading error |
+|---|---|---|
+| 0.31 m (the blind leg) | **0.3 cm** | 1.2 deg |
+| 4.00 m (a dead-reckoned approach) | **54 cm** | 15.4 deg |
+
+That ratio is the whole argument for latching late rather than driving to a
+remembered waypoint.
 
 `camera.fov_near_limit_m` is the measurement this depends on, and HARDWARE.md
 §3.1 asks for it early for exactly this reason. If the real number comes back
-near 0.5 m rather than 0.27 m, a third of every approach is open-loop and the
+near 0.5 m rather than 0.23 m, a third of every approach is open-loop and the
 servo needs redesigning — that is worth knowing before the servo is trusted.
 
 ## 4. Open-loop coverage of the 3×3 m arena needs much better calibration than a 4 m drive does
@@ -152,12 +168,55 @@ constant offset is something you can reason about. The centroid error grows
 with both range and object height, which is indistinguishable from a bad
 homography and would cost days.
 
+## 7. The binding constraint on chasing is the range gate, not the controller
+
+`camera.fov_far_limit_m` is 1.600 m and `GroundProjector` **refuses** to project
+past it rather than extrapolating a calibration that cannot support it. That
+refusal, not any controller limit, is what decides whether a thrown fastener
+gets chased at all.
+
+Fifty randomised targets over x in [0.8, 2.0], y in [-0.7, 0.7] — deliberately
+wider than the camera can see:
+
+| Targets | Caught | Median miss | Worst |
+|---|---|---|---|
+| All 50 | 39 / 50 | 0.7 cm | 213 cm |
+| Range <= 1.60 m | 33 / 34 | 0.6 cm | 110 cm |
+| Range > 1.60 m | 6 / 16 | 185 cm | 213 cm |
+
+Every failure beyond the gate is the same failure: the projector returns `None`
+every frame, the FSM never acquires, and the robot sits still. The single
+in-gate miss was at (0.88, -0.57) — 33 deg off the nose, outside the lateral
+field of view at t=0, which is the *other* half of the same envelope.
+
+Sampling only inside the declared envelope (in view at t=0, range <= 1.60 m):
+
+```
+50 chases: 50 / 50 caught, median 0.6 cm, worst 0.9 cm  (drum picks up over 18 cm)
+```
+
+**Do not quote a catch rate without saying which envelope it was sampled from.**
+The honest headline is "50/50 inside the camera's working range", not "50/50".
+
+Two related robustness runs, same envelope:
+
+* 30% of frames dropped and 5 px of box jitter: still caught, 1.1 cm.
+* Camera killed mid-chase at t = 2.0 s: nav commanded zero at t = 2.38 s
+  (`vision heartbeat lost (0.40 s since the last message)`) and held zero for
+  every one of the 281 commands that followed. Zero watchdog trips — nav keeps
+  publishing `V 0.000 0.000` rather than going silent.
+
+```bash
+uv run fodnav-sim --set mission.mode=target --target 1.4 0.35 --miss-rate 0.3 --jitter-px 5
+uv run fodnav-sim --set mission.mode=target --target 1.4 0.35 --vision-dies-at 2.0
+```
+
 ---
 
 ## Caveats — what these numbers are not
 
 * **The robot is fictional.** `config/sim_robot.yaml` is invented throughout:
-  65 mm wheels, 200 mm track, a 102° lens at 22 cm and 18°. The *mechanisms*
+  65 mm wheels, 200 mm track, a 66° lens at 18 cm and 25°. The *mechanisms*
   are geometric and scale, but every absolute number moves when the real
   measurements land. Nothing here should be re-typed into `config/robot.yaml`.
 * **The chassis model is kinematic.** No motor lag, no acceleration limit, no
