@@ -31,7 +31,7 @@ from ..frames import Pose2D
 from ..link.vision import CONFIRM, PICK, ReplayVisionSource, iter_jsonl, select_targets
 from ..target import TargetParams, TargetSet
 
-from ._common import add_config_args, die, load_configs
+from ._common import add_config_args, config_file, die, load_configs
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -56,11 +56,11 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as e:
         die(str(e))
 
-    calib_path = args.ground_calib or (
-        "config/sim_ground_homography.json"
+    calib_path = config_file(args, args.ground_calib or (
+        "sim_ground_homography.json"
         if "sim_robot" in robot.source
-        else "config/ground_homography.json"
-    )
+        else "ground_homography.json"
+    ))
     try:
         calib = load_ground_calibration(calib_path, robot)
     except Exception as e:

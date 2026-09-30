@@ -23,7 +23,7 @@ Python package: `fodnav`. Console scripts: `fodnav-*`.
 
 Read `docs/protocol.md` before touching `src/fodnav/link/`.
 
-## Status — v0.1.0, 2026-08-22
+## Status — v0.2.1, 2026-09-30
 
 Everything between the detector and the motors is built and tested in
 simulation. Nothing has run on the real chassis.
@@ -79,6 +79,36 @@ Python **3.11** on the Pi (the vision library needs apt's 3.11 camera stack;
 create the venv with `--system-site-packages`). Runtime dependencies are
 `numpy`, `pyserial`, `pyyaml`, `opencv-python-headless` — and that list is a budget, not a starting
 point. Two CPU cores and a Raspberry Pi. Ask before adding to it.
+
+## Installing the released package
+
+Each release is a wheel on
+[GitHub Releases](https://github.com/cussonspoon/fod-robot-pathing/releases),
+the same way `fod-vision` ships. Use it instead of cloning when you only need to
+*run* nav — for example from the integration harness.
+
+On a laptop, with dependencies:
+
+```bash
+pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any directory
+```
+
+On the Pi, into the 3.11 venv created with `--system-site-packages`, **with
+`--no-deps`**: numpy and cv2 come from apt under `python3-picamera2`, and pip does
+not recognise apt's cv2 as `opencv-python-headless`, so without the flag it would
+install a second OpenCV underneath the camera stack.
+
+```bash
+sudo apt install python3-serial python3-yaml
+pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+```
+
+The wheel carries a copy of `config/`, so the sim runs anywhere. That copy's
+`robot.yaml` is the all-`null` template, so a real run still refuses to start
+until it gets measured values: pass your own directory with
+`fodnav-run --config-dir /path/to/config` (holding `robot.yaml`, `nav.yaml` and
+`ground_homography.json`), and an absolute `--set detections.hef=/path/to/best.hef`.
 
 ## Running with no hardware
 
