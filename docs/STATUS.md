@@ -124,10 +124,10 @@ conventions, the watchdog kill-test on the real chassis, one recorded run.
 
 ## Known gaps in the work itself
 
-- **`LibraryVisionSource` has never executed.** The lazy
-  `from fodcv.runtime.vision import Vision` inside `start()` has never run,
-  because `fodcv` exists only on the Pi. Everything around it is covered; that
-  line is not, and neither is his lifecycle.
+- **`LibraryVisionSource.start()` has not run in this repo's tests.** The lazy
+  `from fodcv.runtime.vision import Vision` needs the Pi. Its `poll()` is now
+  covered through `SimVision` (0.2.1), and the integration harness ran
+  `fodnav-run` against the real library on the Pi in its manual-cam phase.
 - **The `cli/` layer has no tests.** Most of it is argparse-only as intended,
   but two pieces have real logic worth covering: `_apply_override` in
   `cli/_common.py` (parses `--set`) and `load_points` in `cli/calib_ground.py`

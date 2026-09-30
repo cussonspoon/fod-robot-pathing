@@ -230,3 +230,68 @@ def test_the_library_is_not_imported_until_start():
     assert "fodcv" not in sys.modules
     assert src.poll() == []                        # not started: no frames, no raise
     assert math.isinf(src.age_s)
+
+
+class _StubVision:
+    """Just enough of his ``Vision``: ``detail()`` returns whatever is set."""
+
+    def __init__(self) -> None:
+        self.d = {"frame_id": 0, "age": math.inf, "camera": {"frame_size": [1280, 720]},
+                  "tracks": [], "error": None}
+        self.age = math.inf
+
+    def detail(self) -> dict:
+        return dict(self.d)
+
+    def frame(self, frame_id: int, age: float = 0.0, error: str | None = None, tracks=()):
+        self.d = {**self.d, "frame_id": frame_id, "age": age, "error": error,
+                  "tracks": list(tracks)}
+        self.age = age
+
+
+def _library(tmp_path=None):
+    from fodnav.link.vision import LibraryVisionSource
+
+    stub = _StubVision()
+    log = JsonlVisionLog(tmp_path / "d.jsonl") if tmp_path is not None else None
+    src = LibraryVisionSource(hef="nowhere/best.hef", log=log)
+    src.attach(stub)
+    return src, stub, log
+
+
+def test_the_same_frame_read_twice_is_offered_once(tmp_path):
+    # His detail() returns the last completed frame on every call. Nav polls at
+    # 50 Hz against his 30 FPS, and a stalled camera answers forever -- so a
+    # repeat is not a new frame, and must not keep the vision heartbeat alive.
+    src, stub, log = _library(tmp_path)
+    stub.frame(7)
+    assert [f.frame_id for f in src.poll()] == [7]
+    stub.frame(7, age=0.2)
+    assert src.poll() == []
+    stub.frame(7, age=4.5)
+    assert src.poll() == []
+    stub.frame(8)
+    assert [f.frame_id for f in src.poll()] == [8]
+    log.close()
+    assert [json.loads(line)["frame_id"] for line in (tmp_path / "d.jsonl").open()] == [7, 8]
+
+
+def test_nothing_is_offered_before_his_first_frame():
+    # age is inf until his thread completes a frame. An empty frame here would
+    # read as "floor clear" and start the heartbeat before the camera has
+    # produced anything.
+    src, stub, _ = _library()
+    assert src.poll() == []
+    assert src.poll() == []
+
+
+def test_an_error_is_offered_even_on_a_repeated_frame_id():
+    # The thread died after frame 5: same id, but now it carries the reason.
+    src, stub, _ = _library()
+    stub.frame(5)
+    src.poll()
+    stub.frame(5, age=0.3, error="RuntimeError('camera gone')")
+    frames = src.poll()
+    assert len(frames) == 1 and frames[0].error
+    assert src.failed
+    assert src.poll() == []                        # terminal: build a new source

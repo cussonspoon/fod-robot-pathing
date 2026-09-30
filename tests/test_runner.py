@@ -139,9 +139,16 @@ def test_a_firmware_built_with_different_constants_refuses_the_run(robot):
 # -- the missions, end to end --------------------------------------------
 
 
-def test_the_robot_collects_a_thrown_fastener(robot):
+# Every mission test that depends on how frames arrive runs twice: once with
+# the push-style queue the sim has always used, and once through
+# LibraryVisionSource polling a SimVision -- the path that runs on the Pi.
+SOURCES = pytest.mark.parametrize("library_vision", [False, True], ids=["queue", "library"])
+
+
+@SOURCES
+def test_the_robot_collects_a_thrown_fastener(robot, library_vision):
     target = (1.35, 0.30)
-    h = harness(robot, mode="target", targets=[target])
+    h = harness(robot, mode="target", targets=[target], library_vision=library_vision)
     h.run(duration_s=40.0)
     summary = h.summary()
     assert summary["fsm"]["targets_collected"] >= 1
@@ -149,25 +156,58 @@ def test_the_robot_collects_a_thrown_fastener(robot):
     assert summary["loop"]["overruns"] == 0
 
 
-def test_it_still_collects_when_the_detector_is_unreliable(robot):
+@SOURCES
+def test_it_still_collects_when_the_detector_is_unreliable(robot, library_vision):
     target = (1.2, -0.25)
     h = harness(
-        robot, mode="target", targets=[target],
+        robot, mode="target", targets=[target], library_vision=library_vision,
         noise=SceneNoise(conf=0.72, conf_noise=0.1, jitter_px=5.0, miss_rate=0.3, seed=11),
     )
     h.run(duration_s=40.0)
     assert h.drum_miss_m(target) < robot.get("drum.width_m") / 2
 
 
-def test_vision_dying_mid_approach_stops_the_robot_short(robot):
+@SOURCES
+def test_vision_dying_mid_approach_stops_the_robot_short(robot, library_vision):
     # The correct outcome is a miss. Driving on to where the nail was last seen
     # would be guessing with a moving robot and a dead camera.
+    #
+    # Through the library this is a *stall*: his capture thread stops producing
+    # frames but detail() keeps answering with the last one, which still holds
+    # a CONFIRM box. Offered as a new frame every tick, that kept the heartbeat
+    # alive and the robot chased the frozen picture past the real target.
     target = (1.6, 0.0)
-    h = harness(robot, mode="target", targets=[target], vision_dead_after_s=2.0)
+    h = harness(robot, mode="target", targets=[target], vision_dead_after_s=2.0,
+                library_vision=library_vision)
     h.run(duration_s=15.0)
     assert h.fsm.state is State.STOPPED
     assert "vision" in h.fsm.reason
     assert h.sim.v_true == 0.0
+    x_dead = h.sim.true_pose.x
+    assert x_dead < target[0]          # stopped short: never drove through it
+
+
+@SOURCES
+def test_a_stalled_camera_stops_the_robot_within_the_vision_timeout(robot, library_vision):
+    # How fast, not just whether. The loop must notice within
+    # loop.vision_timeout_ms of the last real frame, plus one frame period.
+    h = harness(robot, mode="target", targets=[(1.6, 0.0)], vision_dead_after_s=2.0,
+                library_vision=library_vision)
+    stopped_at = None
+
+    def watch(record):
+        # Only after the stall: at t=0 the loop also reports the heartbeat as
+        # lost, because no frame has arrived yet, and that must not count.
+        nonlocal stopped_at
+        if stopped_at is None and record["t"] > 2.0 and record["v"] == 0.0 \
+                and "heartbeat" in (record.get("reason") or ""):
+            stopped_at = record["t"]
+
+    h.loop.on_tick = watch
+    h.run(duration_s=6.0)
+    timeout = h.nav.get("loop.vision_timeout_ms") / 1000.0
+    assert stopped_at is not None
+    assert stopped_at <= 2.0 + timeout + 2.0 / h.vision_rate_hz
 
 
 def test_a_coverage_sweep_completes_and_reports_what_it_swept(robot):

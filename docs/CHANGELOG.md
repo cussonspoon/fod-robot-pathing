@@ -9,6 +9,43 @@ shared contract and needs telling, not just recording.
 
 ---
 
+## 0.2.1 — 2026-09-30 — a frozen camera no longer reads as a live one
+
+**Safety fix.** Found by the integration harness
+([JuniorSE15/fod-robot](https://github.com/JuniorSE15/fod-robot),
+`docs/findings-upstream.md` #1 and #2), confirmed here.
+
+His `detail()` returns the last *completed* frame on every call.
+`LibraryVisionSource.poll()` offered whatever it returned as a new frame, on
+every 50 Hz tick. So when his capture thread stalled -- process alive, no new
+frames -- nav still saw a frame every tick, the `loop.vision_timeout_ms`
+heartbeat could never lapse, and `TargetSet` re-stamped the frozen box as
+fresh. In the harness the robot chased a frozen CONFIRM box through the real
+screw. It also logged every poll, so `detections.jsonl` held each frame ~1.7
+times.
+
+### Changed
+
+- **`LibraryVisionSource` offers a frame only when `frame_id` is new**, and
+  nothing before his first frame (`age` is `inf`). Error frames always go
+  through. A stall now stops the robot 0.4 s after the last real frame, the
+  same as a camera that disappears.
+- **One log line per frame**, not per poll.
+- **`LibraryVisionSource.attach()`** reads from any object shaped like an
+  entered `Vision`; `start()` is still the only path that imports `fodcv`.
+- **`sim.scene.SimVision`** models his library as a *pull*: `detail()` keeps
+  returning the last frame, with `age` growing. `SimHarness(library_vision=True)`
+  drives the Pi's `LibraryVisionSource` through it.
+
+### Why the existing test missed it
+
+`test_vision_dying_mid_approach_stops_the_robot_short` passed because the sim
+fed vision through `QueueVisionSource`, which *pushes* frames and simply goes
+quiet when they stop. The real library is polled and never goes quiet. The
+mission tests that depend on frame arrival now run through both sources.
+
+---
+
 ## 0.2.0 — 2026-09-10 — the vision interface was never going to be MQTT
 
 `fod-vision v0.3.0` was released on 6 September: **a Python library you import,

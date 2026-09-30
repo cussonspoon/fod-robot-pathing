@@ -603,6 +603,13 @@ Each of these costs a session. Add to this list when you find a new one.
   simulation has no relationship to the run, so a vision-timeout test passes for
   the wrong reason and the dropout path is never actually exercised. It is also
   the right thing on hardware: it is the loop that has to notice.
+- **A frozen camera answers every read.** His `detail()` returns the last
+  *completed* frame on every call, with `age` growing, so a stalled capture
+  thread looks exactly like a healthy camera read twice. `LibraryVisionSource`
+  offers a frame only when `frame_id` changes; without that the vision
+  heartbeat never lapses and nav chases a picture. A push-style
+  `QueueVisionSource` cannot show this -- it just goes quiet -- so test anything
+  about frame arrival with `SimHarness(library_vision=True)` as well.
 - **Do not re-implement the vision library's tracking.** It already associates
   on an 80 px radius and applies confidence hysteresis (CONFIRM at 0.5, latched
   until 0.25), and it hands back stable ids. `target.py` used to do all three
