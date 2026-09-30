@@ -25,7 +25,7 @@ It is the part of the robot that decides where to go and drives there.
 5. **Stops safely**:
    - when vision is lost;
    - on any error;
-   - when the camera freezes (see v0.2.1 below).
+   - when the camera freezes (see v0.2.1 under What's new).
 
    The ESP32's watchdog stops the wheels if nav goes silent for 300 ms.
 6. **Records every run**: detections, commands, config and git SHA, in a log folder.
@@ -43,7 +43,7 @@ the camera and the ESP32, so everything above can be tried on a laptop.
 
 ## Install
 
-Latest: **[v0.2.1](https://github.com/cussonspoon/fod-robot-pathing/releases/tag/v0.2.1)**.
+Latest: **[v0.2.2](https://github.com/cussonspoon/fod-robot-pathing/releases/tag/v0.2.2)**.
 Each release is a wheel on
 [GitHub Releases](https://github.com/cussonspoon/fod-robot-pathing/releases),
 the same way `fod-vision` ships. No need to clone this repo to run it.
@@ -51,7 +51,7 @@ the same way `fod-vision` ships. No need to clone this repo to run it.
 **Laptop** (simulator, replay, testing):
 
 ```bash
-pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.2/fod_robot_pathing-0.2.2-py3-none-any.whl
 fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any directory
 ```
 
@@ -59,7 +59,7 @@ fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any dire
 
 ```bash
 sudo apt install python3-serial python3-yaml
-pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.1/fod_robot_pathing-0.2.1-py3-none-any.whl
+pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.2/fod_robot_pathing-0.2.2-py3-none-any.whl
 ```
 
 `--no-deps` is required on the Pi:
@@ -79,7 +79,17 @@ copy's `robot.yaml` has no measured values on purpose, so a real run refuses to
 start until you point it at a folder holding a measured `robot.yaml`, `nav.yaml`
 and `ground_homography.json`.
 
-## What's new in v0.2.1
+## What's new
+
+**v0.2.2**
+
+- **`stream.jsonl` is saved every tick** (every 20 ms), not every 0.5 s.
+  - A live display reading nav's log is now at most one tick behind the
+    serial line.
+  - It is a setting: `log.stream_flush_every` in `nav.yaml`.
+  - See [Reading nav's logs live](#reading-navs-logs-live-for-dashboards).
+
+**v0.2.1**
 
 - **Safety: a frozen camera now stops the robot.**
   - The vision library keeps returning its last picture when the camera
@@ -109,7 +119,7 @@ is written on a different schedule:
 
 | File | Written to disk | So its last line is |
 |---|---|---|
-| `stream.jsonl`: state, `v`, `omega`, `reason` (range and bearing), pose | every 25 ticks (0.5 s), to keep the 50 Hz loop off the SD card | up to **0.5 s old** |
+| `stream.jsonl`: state, `v`, `omega`, `reason` (range and bearing), pose | every tick; `log.stream_flush_every` in `nav.yaml` (before v0.2.2: every 25 ticks) | up to **20 ms old** |
 | `detections.jsonl`: vision's `detail()`, one per frame | every frame | up to ~33 ms old |
 | The serial line itself (`V ...`, if you tap it) | as it is sent | live, ≤ 20 ms |
 
@@ -117,9 +127,11 @@ Every line of `stream.jsonl` is **one moment**: the `reason` (what nav saw) and
 the `v`/`omega` (what it sent) belong together.
 
 - **Take a decision and its command from the same line.**
-- Don't pair a `stream.jsonl` line with a live `V` from the serial line. They
-  can be up to half a second apart, and the numbers will look like they
-  disagree when nothing is wrong.
+- Don't pair a `stream.jsonl` line with a live `V` from the serial line.
+  - Since v0.2.2 they are at most a tick apart, but it is still two moments.
+  - It would drift again if the flush interval were raised or the disk slowed.
+  - Before v0.2.2 they could be half a second apart, which is where a live
+    panel showed `0.60 m` next to `V 0.199` although nothing was wrong.
 - Show the line's own `t` next to it, so the delay is visible.
 
 ## Where things are written down
@@ -136,7 +148,7 @@ the `v`/`omega` (what it sent) belong together.
 
 Read `docs/protocol.md` before touching `src/fodnav/link/`.
 
-## Status — v0.2.1, 2026-09-30
+## Status — v0.2.2, 2026-09-30
 
 Everything between the detector and the motors is built and tested in
 simulation. Nothing has run on the real chassis.

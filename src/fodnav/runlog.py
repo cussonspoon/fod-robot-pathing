@@ -8,9 +8,9 @@ copy with uncommitted changes names something that was never built.
 
 Nothing here is allowed to break a run. Every write is wrapped: a full disk or
 a read-only card degrades the log, it does not stop the robot. And nothing here
-blocks the control loop -- the per-tick stream is buffered and flushed on a
-timer rather than on every line, because an fsync on an SD card is not a
-20-millisecond operation.
+blocks the control loop: the per-tick stream is flushed to the OS (a write into
+the page cache, cheap) every ``flush_every`` ticks, and never fsynced, because
+an fsync on an SD card is not a 20-millisecond operation.
 """
 
 from __future__ import annotations
@@ -61,7 +61,7 @@ class RunLog:
 
     root: Path
     name: str = ""
-    flush_every: int = 25  # ticks; 0.5 s at 50 Hz
+    flush_every: int = 1   # ticks; nav.yaml log.stream_flush_every
 
     def __post_init__(self) -> None:
         stamp = datetime.now().strftime("%Y%m%d-%H%M%S")

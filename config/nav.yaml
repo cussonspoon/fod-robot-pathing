@@ -22,6 +22,15 @@ loop:
                             # At 50 Hz the budget is 20 ms; 30 ms means something
                             # blocked and the watchdog is now in play.
 
+log:
+  stream_flush_every: 1     # ticks. Every tick, so a live display reading
+                            # stream.jsonl is at most 20 ms behind the serial line.
+                            # It was 25 (0.5 s), and a panel pairing that file with a
+                            # live serial tap showed a decision and a command from
+                            # two moments. A flush hands ~200 bytes to the OS page
+                            # cache; it is not an fsync. If a Pi run shows loop
+                            # overruns in summary.json, raise this first.
+
 mission:
   mode: coverage            # coverage | target | idle
                             # CLAUDE.md §11: the evaluation paradigm is UNRESOLVED

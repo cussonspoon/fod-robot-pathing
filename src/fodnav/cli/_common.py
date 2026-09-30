@@ -91,7 +91,8 @@ def _apply_override(nav: Config, path: str, raw: str) -> None:
 def make_run_log(args, name: str, robot: Config, nav: Config) -> RunLog | None:
     if getattr(args, "no_log", False):
         return None
-    log = RunLog(root=args.log_dir, name=args.run_name or name)
+    log = RunLog(root=args.log_dir, name=args.run_name or name,
+                 flush_every=nav.get("log.stream_flush_every"))
     log.write_meta(argv=sys.argv)
     log.write_config(robot, nav)
     return log

@@ -322,6 +322,12 @@ NAV_SCHEMA: dict[str, Field] = {
         float, "a loop iteration longer than this is logged loudly", "ms", "tuned",
         minimum=1.0, maximum=10000.0,
     ),
+    # -- run log -----------------------------------------------------------
+    "log.stream_flush_every": Field(
+        int, "hand stream.jsonl to the OS every this many ticks; 1 = every tick", "ticks",
+        "tuned; a live display reads the file, so it lags by up to this many ticks",
+        minimum=1, maximum=500,
+    ),
     # -- mission -----------------------------------------------------------
     "mission.mode": Field(
         str, "which paradigm runs; CLAUDE.md §11 is unresolved, so this is a switch", "",
