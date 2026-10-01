@@ -22,7 +22,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from .config import Config
+from .config import Config, ConfigError
 from .frames import Pose2D, wrap_angle
 
 __all__ = [
@@ -76,18 +76,27 @@ class Gains:
     goal_radius_m: float
     heading_tolerance_rad: float
     turn_in_place_rad: float
+    reaim_exit_rad: float
     cruise_fraction: float
     lookahead_m: float
     slowdown_bearing_rad: float
 
     @classmethod
     def from_config(cls, nav: Config) -> "Gains":
+        enter, exit_ = nav.get("control.turn_in_place_rad"), nav.get("control.reaim_exit_rad")
+        if exit_ >= enter:
+            raise ConfigError(
+                f"control.reaim_exit_rad ({exit_}) must be below control.turn_in_place_rad "
+                f"({enter}); with no gap between them the path follower flips between "
+                "turning and driving every tick"
+            )
         return cls(
             k_v=nav.get("control.k_v"),
             k_omega=nav.get("control.k_omega"),
             goal_radius_m=nav.get("control.goal_radius_m"),
             heading_tolerance_rad=nav.get("control.heading_tolerance_rad"),
-            turn_in_place_rad=nav.get("control.turn_in_place_rad"),
+            turn_in_place_rad=enter,
+            reaim_exit_rad=exit_,
             cruise_fraction=nav.get("control.cruise_fraction"),
             lookahead_m=nav.get("control.lookahead_m"),
             slowdown_bearing_rad=nav.get("control.slowdown_bearing_rad"),
@@ -406,6 +415,10 @@ class PathFollower:
         self.done = False
         self._cruise = gains.cruise_fraction * limits.v_max
         self._final = WaypointController(self.path[-1], gains, limits)
+        # Two thresholds, not one: start re-aiming past turn_in_place_rad, stop
+        # only inside reaim_exit_rad. With one, the heading error sits on the
+        # threshold at a row end and the command flips stop/drive every tick.
+        self._reaiming = False
 
     @property
     def length_m(self) -> float:
@@ -458,7 +471,11 @@ class PathFollower:
         _, y_l = pose.inverse_transform_point(*target)
         bearing = wrap_angle(math.atan2(target[1] - pose.y, target[0] - pose.x) - pose.theta)
 
-        if abs(bearing) > self.gains.turn_in_place_rad:
+        if self._reaiming:
+            self._reaiming = abs(bearing) > self.gains.reaim_exit_rad
+        else:
+            self._reaiming = abs(bearing) > self.gains.turn_in_place_rad
+        if self._reaiming:
             _, omega = saturate(0.0, self.gains.k_omega * bearing, self.limits)
             return Command(0.0, omega, reason=f"re-aiming onto path, {math.degrees(bearing):+.1f} deg")
 

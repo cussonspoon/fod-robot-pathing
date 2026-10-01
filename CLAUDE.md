@@ -43,7 +43,7 @@ The whole stack runs on a laptop with no camera, no Pi and no robot:
 
 ```bash
 uv run fodnav-sim --set mission.mode=target --target 1.4 0.35   # chase a nail
-uv run fodnav-sim --duration 400                                # sweep the arena
+uv run fodnav-sim --set mission.mode=coverage --duration 400    # sweep the arena
 uv run pytest                                                   # ~1370 tests, <4 s
 ```
 

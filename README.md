@@ -17,15 +17,18 @@ It is the part of the robot that decides where to go and drives there.
    in pixels, each with a track id and `CONFIRM` / `CAUTION`.
 2. **Turns a box into a spot on the floor**, in metres from the robot, using the
    bottom edge of the box and a ground calibration.
-3. **Decides what to do**:
-   - **target** mode chases the nearest confirmed fastener and drives the drum over it;
-   - **coverage** mode sweeps a rectangle row by row.
+3. **Decides what to do**, set by `mission.mode` in `nav.yaml`:
+   - **target** (the default): chase the nearest confirmed fastener and drive
+     the drum over it. While nothing is confirmed, `mission.search` says what to
+     do: **hold** (the default) stands still, **scan** spins slowly to look around.
+   - **coverage**: sweep a rectangle row by row, like a lawnmower, ignoring
+     detections. Run it with `--set mission.mode=coverage`.
 4. **Drives the wheels** by sending `V <speed> <turn>` to the ESP32 over serial,
    50 times a second.
 5. **Stops safely**:
    - when vision is lost;
    - on any error;
-   - when the camera freezes (see v0.2.1 under What's new).
+   - when the camera freezes (see v0.2.1 in the patch notes).
 
    The ESP32's watchdog stops the wheels if nav goes silent for 300 ms.
 6. **Records every run**: detections, commands, config and git SHA, in a log folder.
@@ -43,7 +46,7 @@ the camera and the ESP32, so everything above can be tried on a laptop.
 
 ## Install
 
-Latest: **[v0.2.2](https://github.com/cussonspoon/fod-robot-pathing/releases/tag/v0.2.2)**.
+Latest: **[v0.2.3](https://github.com/cussonspoon/fod-robot-pathing/releases/tag/v0.2.3)**.
 Each release is a wheel on
 [GitHub Releases](https://github.com/cussonspoon/fod-robot-pathing/releases),
 the same way `fod-vision` ships. No need to clone this repo to run it.
@@ -51,7 +54,7 @@ the same way `fod-vision` ships. No need to clone this repo to run it.
 **Laptop** (simulator, replay, testing):
 
 ```bash
-pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.2/fod_robot_pathing-0.2.2-py3-none-any.whl
+pip install https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.3/fod_robot_pathing-0.2.3-py3-none-any.whl
 fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any directory
 ```
 
@@ -59,7 +62,7 @@ fodnav-sim --set mission.mode=target --target 1.4 0.35     # works from any dire
 
 ```bash
 sudo apt install python3-serial python3-yaml
-pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.2/fod_robot_pathing-0.2.2-py3-none-any.whl
+pip install --no-deps https://github.com/cussonspoon/fod-robot-pathing/releases/download/v0.2.3/fod_robot_pathing-0.2.3-py3-none-any.whl
 ```
 
 `--no-deps` is required on the Pi:
@@ -79,9 +82,30 @@ copy's `robot.yaml` has no measured values on purpose, so a real run refuses to
 start until you point it at a folder holding a measured `robot.yaml`, `nav.yaml`
 and `ground_homography.json`.
 
-## What's new
+## Patch notes
 
-**v0.2.2**
+**v0.2.3**: 2026-10-01
+
+- **The default mode is now `target` (chase), with `hold`.**
+  - This matches the team's decision to chase a thrown screw.
+  - Before, `nav.yaml` defaulted to `coverage`, so a run without
+    `--set mission.mode=...` swept the arena instead of chasing.
+  - Coverage still works: add `--set mission.mode=coverage`.
+- **Coverage no longer judders at row ends.**
+  - At each row end, the robot turns on the spot when it is more than 34° off
+    the path. It used to start driving again the moment it was under 34°.
+    Driving pushed it back over, so it flipped stop/go every 20–40 ms
+    (786 times in one sweep).
+  - Now, once it starts turning, it keeps turning until it is within 23°
+    (`control.reaim_exit_rad`), then drives off once.
+  - Effect in the simulator:
+    - 1–3-tick turn spells: 367 → 0;
+    - stop/go switches: 786 → 128;
+    - cost: about 1% longer, under 1 point of coverage.
+  - Found from the `manual_cam_coverage` run on the Pi.
+- **Tests:** 1386, including one that fails if the judder comes back.
+
+**v0.2.2**: 2026-09-30
 
 - **`stream.jsonl` is saved every tick** (every 20 ms), not every 0.5 s.
   - A live display reading nav's log is now at most one tick behind the
@@ -89,7 +113,7 @@ and `ground_homography.json`.
   - It is a setting: `log.stream_flush_every` in `nav.yaml`.
   - See [Reading nav's logs live](#reading-navs-logs-live-for-dashboards).
 
-**v0.2.1**
+**v0.2.1**: 2026-09-30
 
 - **Safety: a frozen camera now stops the robot.**
   - The vision library keeps returning its last picture when the camera
@@ -148,7 +172,7 @@ the `v`/`omega` (what it sent) belong together.
 
 Read `docs/protocol.md` before touching `src/fodnav/link/`.
 
-## Status — v0.2.2, 2026-09-30
+## Status — v0.2.3, 2026-10-01
 
 Everything between the detector and the motors is built and tested in
 simulation. Nothing has run on the real chassis.
@@ -219,7 +243,7 @@ uv run fodnav-sim --set mission.mode=target --target 1.4 0.35 --duration 30
 Sweep the arena instead:
 
 ```bash
-uv run fodnav-sim --duration 400
+uv run fodnav-sim --set mission.mode=coverage --duration 400
 ```
 
 Watch the robot stop when the camera process dies:

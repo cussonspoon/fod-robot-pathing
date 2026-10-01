@@ -16,7 +16,7 @@ item 7, integration on the real chassis, has not started.
 ```bash
 uv run pytest                                                   # ~1370 tests, <4 s
 uv run fodnav-sim --set mission.mode=target --target 1.4 0.35   # chase a fastener
-uv run fodnav-sim --duration 400                                # sweep the arena
+uv run fodnav-sim --set mission.mode=coverage --duration 400    # sweep the arena
 ```
 
 `config/robot.yaml` is **34 of 36 values still null**. That is the intended
@@ -24,10 +24,11 @@ state, not an outstanding task for nav: it is Teemy's file and nothing in it has
 been measured. Everything that needs one of those numbers fails at startup
 naming the field and its `docs/HARDWARE.md` procedure.
 
-Git: everything is on `main`. **v0.2.2 is published as a wheel on GitHub
+Git: everything is on `main`. **v0.2.3 is published as a wheel on GitHub
 Releases** -- install it rather than cloning when you only need to run nav (see
 the README). It carries the stalled-camera safety fix (0.2.1) and a
-per-tick `stream.jsonl` for live displays (0.2.2).
+per-tick `stream.jsonl` for live displays (0.2.2), and since 0.2.3
+the default mission is the chase (`target`/`hold`).
 
 ## The vision interface changed under us (2026-09-10)
 

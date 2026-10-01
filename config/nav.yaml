@@ -32,11 +32,13 @@ log:
                             # overruns in summary.json, raise this first.
 
 mission:
-  mode: coverage            # coverage | target | idle
-                            # CLAUDE.md §11: the evaluation paradigm is UNRESOLVED
-                            # between the team and the advisor. Both modes are
-                            # built; this switch picks one at run time. Do not
-                            # delete the other branch to tidy up.
+  mode: target              # coverage | target | idle
+                            # target: the advisor's brief for the next meeting is to
+                            # chase a thrown screw (docs/STATUS.md). CLAUDE.md §11:
+                            # the evaluation paradigm is still formally unresolved.
+                            # Both modes are built; this switch picks one at run
+                            # time, and coverage is one --set away. Do not delete
+                            # the other branch to tidy up.
   search: hold              # hold | scan -- what target mode does with nothing in view.
                             # hold is the default because a search pattern is an
                             # invented behaviour with no requirement behind it: the
@@ -55,6 +57,11 @@ control:                    # move_to() and follow_path(), for planned waypoints
   goal_radius_m: 0.05       # arrival tolerance for a coverage waypoint
   heading_tolerance_rad: 0.05
   turn_in_place_rad: 0.60   # heading error past which forward speed is zeroed
+  reaim_exit_rad: 0.40      # ~23 deg. Once the path follower stops to re-aim, it keeps
+                            # turning until the error is this small. With one threshold
+                            # it sat on 0.60 at every row end and flipped stop/drive
+                            # every 20-40 ms -- invisible in a kinematic sim, a judder
+                            # and wheel slip on real motors.
   k_omega: 2.0              # tuned in sim; RE-TUNE ON HARDWARE
   k_v: 1.2                  # tuned in sim; RE-TUNE ON HARDWARE
   cruise_fraction: 0.60     # of the measured drive.v_max_mps
