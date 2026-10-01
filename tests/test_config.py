@@ -245,3 +245,11 @@ def test_the_shipped_config_dir_is_the_repo_one_in_a_checkout(tmp_path, monkeypa
     d = find_config_dir()
     assert (d / "nav.yaml").is_file() and (d / "sim_robot.yaml").is_file()
 
+
+def test_the_shipped_default_mission_is_the_chase():
+    # docs/STATUS.md: the team's call, on the advisor's brief, is to chase a
+    # thrown screw. Coverage is still built and one --set away (CLAUDE.md §11).
+    nav = load_nav_config(NAV_YAML)
+    assert nav.get("mission.mode") == "target"
+    assert nav.get("mission.search") == "hold"
+

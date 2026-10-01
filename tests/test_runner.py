@@ -219,6 +219,26 @@ def test_a_coverage_sweep_completes_and_reports_what_it_swept(robot):
     assert coverage["fraction"] > 0.95
 
 
+def test_a_coverage_sweep_does_not_judder_at_row_ends(robot):
+    # Before 0.2.3, 367 of 393 re-aim spells in this sweep lasted 1-3 ticks: the
+    # heading error sat on turn_in_place_rad and the wheels were told
+    # stop/go/stop every 20-40 ms. A kinematic sim does not mind; motors do.
+    h = harness(robot, mode="coverage", params=SimParams.perfect())
+    reasons: list[str] = []
+    h.loop.on_tick = lambda r: reasons.append(r["reason"] or "")
+    h.run(duration_s=600.0)
+    spells, n = [], 0
+    for r in reasons:
+        if r.startswith("re-aiming onto path"):
+            n += 1
+        elif n:
+            spells.append(n)
+            n = 0
+    assert spells, "a sweep has row ends, so it re-aims"
+    assert min(spells) > 3, sorted(spells)[:10]
+    assert len(spells) < 3 * h.summary()["fsm"]["waypoints"]
+
+
 def test_odometry_drift_is_what_ruins_a_coverage_sweep(robot):
     # Same path, same controller, same everything except a 1.5% wheel-scale
     # mismatch. This is the number that says whether open-loop coverage of the

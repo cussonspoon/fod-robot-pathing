@@ -367,6 +367,11 @@ NAV_SCHEMA: dict[str, Field] = {
         float, "beyond this heading error, stop translating and turn on the spot", "rad", "tuned",
         minimum=0.01, maximum=math.pi,
     ),
+    "control.reaim_exit_rad": Field(
+        float, "once a path re-aim starts, keep turning until inside this heading error",
+        "rad", "tuned; must be below turn_in_place_rad or the re-aim chatters",
+        minimum=0.001, maximum=math.pi,
+    ),
     "control.k_omega": Field(
         float, "heading P gain, rad/s per rad", "1/s", "tuned in sim, re-tune on hardware",
         minimum=0.0, maximum=50.0,

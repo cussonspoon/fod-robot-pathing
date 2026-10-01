@@ -9,6 +9,53 @@ shared contract and needs telling, not just recording.
 
 ---
 
+## 0.2.3 — 2026-10-01 — chase by default; coverage turns without juddering
+
+### Default mission is `target` / `hold`
+
+`nav.yaml` shipped `mission.mode: coverage` while `docs/STATUS.md` records the
+team's call to chase, on the advisor's brief. A `fodnav-run` without a `--set`
+therefore swept the arena. The default is now `target` with `search: hold`.
+Coverage is unchanged and one `--set mission.mode=coverage` away. CLAUDE.md §11
+still holds: both modes stay built, and this changes only which one runs when
+nobody says.
+
+Two FSM safety tests had relied on the old default to see the robot *moving*
+on tick one. In target/hold it correctly stands still, so they now pin
+coverage explicitly.
+
+### Path re-aim hysteresis (`control.reaim_exit_rad`, 0.40 rad)
+
+`PathFollower` stopped to re-aim past `turn_in_place_rad` (0.60) and resumed
+the moment it was back under it. At a row end the heading error sat on that
+line, and the command flipped `v=0` / `v=0.19` every 1–2 ticks. In one sweep
+367 of 393 re-aim spells lasted 1–3 ticks: 786 stop/go switches. A kinematic
+sim cannot feel that. Real motors would judder and slip, and slip is what
+coverage cannot afford.
+
+The fix uses two thresholds: enter past 0.60 and leave only inside 0.40.
+`WaypointController` already behaved this way (it turns until
+`heading_tolerance_rad`). `Gains.from_config` refuses an exit at or above the
+entry.
+
+Choosing 0.40 (sweep, `--perfect` / error model seeds 1–3):
+
+| exit | coverage, perfect | time | spells | coverage, errors |
+|---|---|---|---|---|
+| 0.59 | 99.0% | 156.3 s | 315 | 53.1 / 57.3 / 52.8% |
+| 0.50 | 98.9% | 156.5 s | 96 | 52.9 / 56.7 / 52.5% |
+| **0.40** | **98.6%** | **158.1 s** | **66** | **52.3 / 56.4 / 52.1%** |
+| 0.26 | 98.3% | 162.9 s | 52 | 50.0 / 55.5 / 51.0% |
+
+At 0.40 there are no 1–3-tick spells left, for about 1% more time. The coverage
+table in SIM_FINDINGS §4 was re-measured; it moved by under 1.5 points.
+
+Found from the harness's `manual_cam_coverage` Pi run (240 re-aim spells in
+156 s, errors to ±81°). The laptop sim reproduced it exactly (156.3 s, 10% of
+ticks, 81°), so it was nav's behaviour, not the bench setup.
+
+---
+
 ## 0.2.2 — 2026-09-30 — the run log keeps up with the wire
 
 `stream.jsonl` is flushed every tick instead of every 25.

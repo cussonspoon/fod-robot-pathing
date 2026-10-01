@@ -316,3 +316,43 @@ def test_a_finished_path_stays_finished(robot, gains, limits):
     pf = PathFollower([(0.0, 0.0), (1.0, 0.0)], gains, limits)
     drive(robot, pf)
     assert pf.update(Pose2D(0.0, 0.0, 0.0)).done
+
+
+# -- re-aiming on a path: two thresholds, not one ------------------------------
+
+
+def _bearing_to_heading(follower, theta):
+    """Pose on a straight +x path whose lookahead bearing is about -theta."""
+    return follower.update(Pose2D(0.0, 0.0, theta))
+
+
+def test_a_path_re_aim_keeps_turning_until_inside_the_exit_angle(gains):
+    # Enter past turn_in_place_rad, leave only inside reaim_exit_rad. With one
+    # threshold a heading error sitting on it flipped stop/drive every tick.
+    assert gains.reaim_exit_rad < gains.turn_in_place_rad
+    between = 0.5 * (gains.reaim_exit_rad + gains.turn_in_place_rad)
+    f = PathFollower([(0.0, 0.0), (5.0, 0.0)], gains, MotionLimits.unlimited())
+
+    cmd = _bearing_to_heading(f, -(gains.turn_in_place_rad + 0.05))
+    assert cmd.v == 0.0 and cmd.reason.startswith("re-aiming")
+    cmd = _bearing_to_heading(f, -between)                  # still turning
+    assert cmd.v == 0.0 and cmd.reason.startswith("re-aiming")
+    cmd = _bearing_to_heading(f, -(gains.reaim_exit_rad - 0.05))
+    assert cmd.v > 0.0 and cmd.reason.startswith("pursuing")
+
+
+def test_the_same_heading_error_drives_if_no_re_aim_is_in_progress(gains):
+    between = 0.5 * (gains.reaim_exit_rad + gains.turn_in_place_rad)
+    f = PathFollower([(0.0, 0.0), (5.0, 0.0)], gains, MotionLimits.unlimited())
+    cmd = _bearing_to_heading(f, -between)
+    assert cmd.v > 0.0 and cmd.reason.startswith("pursuing")
+
+
+def test_an_exit_angle_at_or_above_the_entry_angle_is_refused(nav):
+    from fodnav.config import ConfigError
+
+    bad = load_nav_config("config/nav.yaml")
+    bad._values["control.reaim_exit_rad"] = bad.get("control.turn_in_place_rad")
+    with pytest.raises(ConfigError, match="reaim_exit_rad"):
+        Gains.from_config(bad)
+

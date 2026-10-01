@@ -94,13 +94,17 @@ rows 15.3 cm apart — 17 of them):
 
 | Wheel-scale mismatch | Arena swept | Final odometry error |
 |---|---|---|
-| no errors at all (`--perfect`) | 99.5% | 0 cm |
-| 0.0% | 94.0% | 25 cm |
-| 0.1% | 94.3% | 20 cm |
-| 0.2% | 90.8% | 57 cm |
-| 0.5% | 82.0% | 159 cm |
-| 1.0% | 69.5% | 267 cm |
-| 1.5% | 51.5% | 280 cm |
+| no errors at all (`--perfect`) | 99.3% | 0 cm |
+| 0.0% | 94.2% | 28 cm |
+| 0.1% | 95.2% | 15 cm |
+| 0.2% | 91.3% | 53 cm |
+| 0.5% | 81.8% | 157 cm |
+| 1.0% | 68.2% | 268 cm |
+| 1.5% | 50.3% | 285 cm |
+
+Re-measured for 0.2.3, whose path follower finishes a re-aim before driving
+on (`control.reaim_exit_rad`). Every row moved by under 1.5 points and the
+conclusions below are unchanged.
 
 Two things to read off this.
 
@@ -123,9 +127,10 @@ conversation to have with the advisor, not a gain to tune.
 Each row, exactly:
 
 ```bash
-uv run fodnav-sim --duration 600 --set planner.swath_source=drum_capture \
-                  --set sim.wheel_scale_left=1.002
-uv run fodnav-sim --duration 600 --set planner.swath_source=drum_capture --perfect
+uv run fodnav-sim --set mission.mode=coverage --duration 600 \
+                  --set planner.swath_source=drum_capture --set sim.wheel_scale_left=1.002
+uv run fodnav-sim --set mission.mode=coverage --duration 600 \
+                  --set planner.swath_source=drum_capture --perfect
 ```
 
 Note the `--set planner.swath_source=drum_capture`: the shipped default is

@@ -83,13 +83,15 @@ def test_a_watchdog_trip_stops_the_robot(robot):
 def test_the_obstacle_flag_stops_the_robot_when_configured(robot):
     fsm = NavFsm(robot, nav_cfg(safety__stop_on_obstacle=True))
     assert fsm.update(alive(telemetry=telem(0x09))).is_stop
-    fsm2 = NavFsm(robot, nav_cfg(safety__stop_on_obstacle=False))
+    # Coverage, because it moves from the first tick: in target/hold the robot
+    # stands still waiting for a fastener, which looks the same as a stop.
+    fsm2 = NavFsm(robot, nav_cfg(safety__stop_on_obstacle=False, mission__mode="coverage"))
     assert not fsm2.update(alive(telemetry=telem(0x09))).is_stop
 
 
 def test_a_low_battery_is_a_warning_by_default(robot):
     # Bit 6 is a warning; the firmware owns the actual cutoff.
-    fsm = NavFsm(robot, nav_cfg())
+    fsm = NavFsm(robot, nav_cfg(mission__mode="coverage"))   # moves from tick one
     assert not fsm.update(alive(telemetry=telem(0x41))).is_stop
 
 
