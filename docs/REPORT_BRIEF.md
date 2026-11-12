@@ -113,7 +113,8 @@ built because the advisor has not formally chosen between them.
   and Hailo, with the motors simulated ("manual-cam"). The ground calibration
   for that bench mount was not done, so ranges were approximate.
 
-**Simulation only — invented robot constants, NOT robot results**
+**Simulation only — pending, to be verified on the real robot** (the sim uses
+invented robot constants, so these are not robot results)
 
 - 0.6–1.7 cm error at the drum after a chase (with the odometry error model on)
 - 50/50 catches with targets inside the camera's range; 39/50 when scattered
@@ -158,8 +159,9 @@ recorded run.
 
 ## Writing rules
 
-- **Never present simulation numbers as results.** Label them "in simulation"
-  or leave them out.
+- **A simulation-only number is pending work, not a result.** Tag it
+  "[Pending: to be verified on the real robot]" and also list it under future
+  work.
 - **Never invent a number.** If something is not measured, say so.
 - **Inference speed does not limit driving speed.** Hailo removed that limit;
   do not write otherwise. If adaptive speed control comes up, its new
