@@ -23,7 +23,7 @@ decision only you can make. Updated at each handoff.
 | Status | Action | Why it's blocked here | Since |
 |---|---|---|---|
 | PENDING | **Measure the camera mount (PRD O-3): height, down-tilt, and `fov_near_limit_m`.** Then re-run the ground calibration. | Needs the physical robot. It is the most contended number in the project: it sets Bthcorn's `lookahead` *and* our blind leg *and* the homography, and all three are invalid until it is fixed and recorded. | 2026-08-28 |
-| PENDING | **Install `fod-vision` into a 3.11 venv on the Pi** (`--system-site-packages`) and run `fodnav-run` once. | Needs the Pi. `LibraryVisionSource.start()` has never executed anywhere — the 2026-09-24 recordings came from his `capture_raw.py`, not from our adapter. | 2026-09-10 |
+| DONE | Install `fod-vision` on the Pi and run `fodnav-run` against the real camera. The harness's manual-cam phase (`JuniorSE15/fod-robot`, `docs/manual-cam.md`) ran it on the Pi 5 with the real camera and Hailo and the motors simulated. The bench mount was never ground-calibrated, so its ranges were approximate. | — | 2026-09-30 |
 | PENDING | **Run nav against Teemy's v1 firmware on the bench**, and get his explicit sign-off on `docs/protocol.md`. He pushed a v1 build to `Teemy17/fod-robot-esp32` branch `v1-encoders` (`9dc726d`), and it carries both amendments (millimetre lengths in `I`; watchdog arms on first command). | Needs the ESP32. Nothing has run `link/esp32.py` against his code, and only those two features were checked against the spec, not the whole document. Until the constants are measured and he builds with `-D ROBOT_CONSTANTS_MEASURED=1`, his `I` line reports `0.000`, and `Esp32Link.verify` refuses it against any measured `robot.yaml` — correctly. | 2026-11-05 |
 | DONE | Get a 30 s `detail()` recording from Bthcorn's board and replay it. Three captures, 2130 frames, nav's `latest()` matches his on every one — `cv_tests/2026-09-24/output/summary.md`. | — | 2026-09-24 |
 | DONE | Push `feat/integrate-cv-library` to origin (merged to `main` as PR #3). | — | 2026-09-10 |
@@ -240,8 +240,8 @@ verbatim** -- nav defines no wire schema of its own, which is precisely why the
 two sides cannot drift apart over a field name again. `fodnav-replay` feeds a
 log back through the same interface, so the whole nav stack is testable against
 real detector output with no camera, no Pi and no robot. That replay is the
-cheapest real integration test available and it has not been run against a real
-recording yet.
+cheapest real integration test available; its first run against real recordings
+is `cv_tests/2026-09-24/output/summary.md`.
 
 ### Package layout
 
@@ -451,8 +451,8 @@ once it has failed or exited, build a new one.
 
 `tools/fake_vision_log.py` writes his `detail()` shape to a JSONL file with no
 camera involved, and `fodnav-replay` reads it. It is a stand-in written from his
-spec, not his code -- **the first real check is replaying thirty seconds of
-output from his board**, which nobody has done.
+spec, not his code. The real check, replaying output from his board, was done
+on 2026-09-24: `cv_tests/2026-09-24/output/summary.md`.
 
 ---
 
